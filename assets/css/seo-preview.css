@@ -1,0 +1,199 @@
+.csv-seo-preview-widget {
+    background: white;
+    border: 1px solid #c3c4c7;
+    border-radius: 6px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.csv-seo-preview-widget h3 {
+    margin: 0 0 15px 0;
+    color: #1d2327;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.seo-live-indicator {
+    background: #00a32a;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    animation: seo-pulse 2s infinite;
+}
+
+@keyframes seo-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.seo-engine-tabs, .seo-device-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 15px;
+}
+
+.seo-tab, .device-tab {
+    padding: 6px 12px;
+    border: 1px solid #c3c4c7;
+    background: white;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.seo-tab.active, .device-tab.active {
+    background: #2271b1;
+    color: white;
+    border-color: #2271b1;
+}
+
+.seo-preview-container {
+    background: #f8f9fa;
+    border: 1px solid #e1e8ed;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    min-height: 120px;
+}
+
+.serp-preview {
+    display: none;
+}
+
+.serp-preview.active {
+    display: block;
+}
+
+/* Google SERP Style */
+.google-serp .serp-result {
+    font-family: arial, sans-serif;
+}
+
+.google-serp .serp-title {
+    color: #1a0dab;
+    font-size: 20px;
+    font-weight: normal;
+    margin-bottom: 4px;
+    line-height: 1.3;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.google-serp .serp-title:hover {
+    text-decoration: underline;
+}
+
+.google-serp .serp-url {
+    color: #006621;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.google-serp .serp-description {
+    color: #545454;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Bing SERP Style */
+.bing-serp .serp-result {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.bing-serp .serp-title {
+    color: #0060c7;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    line-height: 1.3;
+    cursor: pointer;
+}
+
+.bing-serp .serp-url {
+    color: #0e7034;
+    font-size: 13px;
+    margin-bottom: 4px;
+}
+
+.bing-serp .serp-description {
+    color: #262626;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* Mobile Responsive */
+.device-tab.active[data-device="mobile"] ~ .seo-preview-container .google-serp .serp-title {
+    font-size: 18px;
+}
+
+.device-tab.active[data-device="mobile"] ~ .seo-preview-container .google-serp .serp-description {
+    font-size: 13px;
+}
+
+.seo-metrics {
+    background: #f0f6fc;
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #c8e1ff;
+    margin-bottom: 15px;
+}
+
+.seo-metrics h4 {
+    margin: 0 0 10px 0;
+    color: #0969da;
+    font-size: 14px;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.metric-value {
+    font-weight: 600;
+}
+
+.metric-value.good { color: #00a32a; }
+.metric-value.warning { color: #f56e28; }
+.metric-value.bad { color: #d63638; }
+
+.seo-recommendations {
+    background: #fff9e6;
+    border: 1px solid #f0d000;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.seo-recommendation {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+}
+
+.seo-recommendation:last-child {
+    margin-bottom: 0;
+}
+
+.recommendation-icon {
+    font-size: 14px;
+    margin-top: 1px;
+}
+
+.recommendation-icon.info { color: #0073aa; }
+.recommendation-icon.warning { color: #f56e28; }
+.recommendation-icon.error { color: #d63638; }
+
+.recommendation-text {
+    flex: 1;
+    line-height: 1.4;
+}
