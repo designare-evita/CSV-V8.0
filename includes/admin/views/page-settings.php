@@ -24,15 +24,50 @@ $current_seo_pl = get_option( 'csv_import_seo_plugin', 'none' );
 	<?php
     // Anzeige für Erfolgs- oder Fehlermeldungen (z.B. vom Template-Generator)
     if ( isset( $action_result ) && is_array( $action_result ) ) {
-        $notice_class   = $action_result['success'] ? 'notice-success' : 'notice-error';
+        $notice_class   = $action_result['success'] ? 'notice-success is-dismissible notice-large' : 'notice-error is-dismissible';
         $notice_message = $action_result['message'];
-        echo '<div class="notice ' . esc_attr( $notice_class ) . ' is-dismissible"><p>' . wp_kses_post( $notice_message ) . '</p></div>';
+        echo '<div class="notice ' . esc_attr( $notice_class ) . '"><p>' . wp_kses_post( $notice_message ) . '</p></div>';
     } elseif ( isset( $_GET['settings-updated'] ) ) {
         // Standard-WordPress-Meldung nach dem Speichern der Einstellungen
         settings_errors();
     }
     ?>
+	<div class="csv-settings-dashboard" style="margin-top: 2rem;">
+        <div class="csv-import-box settings-box" style="grid-column: 1 / -1;">
+            <h3>
+                <span class="step-icon">✨</span>
+                Automatischer Template-Generator
+            </h3>
+            <p>Erstellen Sie automatisch ein neues Import-Template. Das Plugin liest die Spalten Ihrer CSV-Datei aus und fügt alle verfügbaren Platzhalter in eine Kopie Ihres Basis-Designs ein.</p>
+            
+            <form method="post">
+                <?php wp_nonce_field( 'csv_import_generate_template' ); ?>
+                <input type="hidden" name="action" value="generate_template_from_csv">
 
+                <table class="form-table compact-form" role="presentation">
+                    <tbody>
+                        <tr>
+                            <th scope="row"><label for="base_template_id">Basis-Post ID</label></th>
+                            <td>
+                                <input type="number" id="base_template_id" name="base_template_id" class="small-text" required placeholder="z.B. 123">
+                                <p class="description">ID der Seite/des Beitrags, dessen Design als Grundlage dienen soll.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="new_template_name">Name des neuen Templates</label></th>
+                            <td>
+                                <input type="text" id="new_template_name" name="new_template_name" class="regular-text" required placeholder="z.B. Landingpage Vorlage V2">
+                                <p class="description">Wie soll das neue Template (als Entwurf) heißen?</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="action-buttons" style="margin-top: 15px;">
+                    <button type="submit" class="button button-primary">Template generieren</button>
+                </div>
+            </form>
+        </div>
+    </div>
 	<form method="post" action="options.php">
 		<?php
 		// WordPress-Funktion zum Behandeln der Einstellungs-Speicherung
@@ -145,7 +180,7 @@ $current_seo_pl = get_option( 'csv_import_seo_plugin', 'none' );
 								<input type="text" id="csv_import_delimiter" name="csv_import_delimiter"
 									   value="<?php echo esc_attr( get_option( 'csv_import_delimiter', 'auto' ) ); ?>"
 									   class="small-text">
-								<p class="description">Standard: <code>auto</code> für automatische Erkennung.</p>
+								<p class="description">Standard: code>auto</code> für automatische Erkennung.</p>
 							</td>
 						</tr>
 					</tbody>
@@ -245,46 +280,10 @@ $current_seo_pl = get_option( 'csv_import_seo_plugin', 'none' );
 			<?php submit_button( '💾 Einstellungen speichern', 'primary large', 'submit', false ); ?>
 		</div>
 
-	</form> <div class="csv-settings-dashboard" style="margin-top: 2rem;">
-        <div class="csv-import-box settings-box" style="grid-column: 1 / -1;">
-            <h3>
-                <span class="step-icon">✨</span>
-                Automatischer Template-Generator
-            </h3>
-            <p>Erstellen Sie automatisch ein neues Import-Template. Das Plugin liest die Spalten Ihrer CSV-Datei aus und fügt alle verfügbaren Platzhalter in eine Kopie Ihres Basis-Designs ein.</p>
-            
-            <form method="post">
-                <?php wp_nonce_field( 'csv_import_generate_template' ); ?>
-                <input type="hidden" name="action" value="generate_template_from_csv">
-
-                <table class="form-table compact-form" role="presentation">
-                    <tbody>
-                        <tr>
-                            <th scope="row"><label for="base_template_id">Basis-Post ID</label></th>
-                            <td>
-                                <input type="number" id="base_template_id" name="base_template_id" class="small-text" required placeholder="z.B. 123">
-                                <p class="description">ID der Seite/des Beitrags, dessen Design als Grundlage dienen soll.</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row"><label for="new_template_name">Name des neuen Templates</label></th>
-                            <td>
-                                <input type="text" id="new_template_name" name="new_template_name" class="regular-text" required placeholder="z.B. Landingpage Vorlage V2">
-                                <p class="description">Wie soll das neue Template (als Entwurf) heißen?</p>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="action-buttons" style="margin-top: 15px;">
-                    <button type="submit" class="button button-primary">Template generieren</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-
-    <div class="csv-settings-dashboard" style="margin-top: 2rem;">
-        <div class="csv-import-box settings-box" style="grid-column: 1 / -1;">
+	</form> 
+	
+	<div class="csv-settings-grid-half">
+        <div class="csv-import-box settings-box">
             <h3>
                 <span class="step-number active">5</span>
                 <span class="step-icon">🧪</span>
@@ -311,7 +310,8 @@ $current_seo_pl = get_option( 'csv_import_seo_plugin', 'none' );
                 </div>
             </div>
         </div>
-
+	</div>
+	<div class="csv-settings-grid-half">
         <div id="csv-column-mapping-container" class="csv-import-box settings-box" style="display:none;">
             <h3>
                 <span class="step-number active">7</span>
@@ -321,7 +321,7 @@ $current_seo_pl = get_option( 'csv_import_seo_plugin', 'none' );
             <div id="mapping-table-target"></div>
         </div>
 
-        <div id="csv-live-preview-container" class="csv-import-box settings-box" style="display:none; grid-column: 1 / -1;">
+        <div id="csv-live-preview-container" class="csv-import-box settings-box" style="display:none;">
             <h3>
                 <span class="step-number active">8</span>
                 <span class="step-icon">👀</span>
@@ -353,5 +353,5 @@ $current_seo_pl = get_option( 'csv_import_seo_plugin', 'none' );
                 </div>
             </div>
         </div>
-    </div>
+	</div>
 </div>
