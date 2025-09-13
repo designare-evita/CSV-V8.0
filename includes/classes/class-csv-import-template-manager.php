@@ -18,7 +18,7 @@ class CSV_Import_Template_Manager {
      * @param string $new_template_name Der Name des neuen Template-Posts.
      * @return int|WP_Error Die ID des neuen Posts oder ein WP_Error-Objekt bei einem Fehler.
      */
-    public static function create_template_from_csv_headers(int $base_post_id, string $new_template_name): int|WP_Error {
+    public static function create_template_from_csv_headers(int $base_post_id, string $new_template_name) {
         // 1. Prüfen, ob die benötigten Core-Funktionen existieren
         if (!function_exists('csv_import_get_config') || !function_exists('csv_import_load_csv_data')) {
             return new WP_Error(
@@ -109,7 +109,7 @@ class CSV_Import_Template_Manager {
      * @param array $data        Die Datenzeile aus der CSV.
      * @return string|WP_Error Der verarbeitete Inhalt oder ein Fehler.
      */
-    public static function apply_placeholders_to_content(int $template_id, array $data): string|WP_Error {
+    public static function apply_placeholders_to_content(int $template_id, array $data) {
         $template_post = get_post($template_id);
         if (!$template_post) {
             return new WP_Error('template_not_found', 'Template mit ID ' . $template_id . ' nicht gefunden.');
@@ -123,12 +123,6 @@ class CSV_Import_Template_Manager {
         
         return $content;
     }
-}
-// ===================================================================
-// TEMPLATE MANAGEMENT SYSTEM
-// ===================================================================
-
-class CSV_Import_Template_Manager {
     
     public static function create_template_from_post($post_id, $template_name) {
         $post = get_post($post_id);
