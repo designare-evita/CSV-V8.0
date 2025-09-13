@@ -1,7 +1,7 @@
 <?php
 /**
  * View-Datei für die Einstellungsseite.
- * NEUE VERSION: Flexibles Grid Layout für optimale Darstellung
+ * NEUE VERSION: Flexibles Grid Layout mit intelligentem Template-Generator.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -15,30 +15,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 	</div>
 
 	<?php
-if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
-    // Zeigt die Standard-Erfolgsmeldung von WordPress an
-    settings_errors();
+    // Standard-Erfolgsmeldung von WordPress nach dem Speichern
+    if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
+        settings_errors();
 
-    // Fügt unseren neuen, großen Button hinzu
-    echo '<div class="csv-import-box" style="margin-bottom: 20px; border-left: 4px solid #00a32a;">';
-    echo '<h3>Nächster Schritt</h3>';
-    echo '<p>Ihre Einstellungen wurden gespeichert. Sie können jetzt mit dem Import beginnen.</p>';
-    echo '<a href="' . esc_url( admin_url( 'admin.php?page=csv-import' ) ) . '" class="button button-primary button-large" style="background: #00a32a; border-color: #00a32a; text-shadow: none;">';
-    echo '🚀 Zum Import-Dashboard';
-    echo '</a>';
-    echo '</div>';
-}
-?>
+        echo '<div class="csv-import-box" style="margin-bottom: 20px; border-left: 4px solid #00a32a;">';
+        echo '<h3>Nächster Schritt</h3>';
+        echo '<p>Ihre Einstellungen wurden gespeichert. Sie können jetzt mit dem Import beginnen.</p>';
+        echo '<a href="' . esc_url( admin_url( 'admin.php?page=csv-import' ) ) . '" class="button button-primary button-large" style="background: #00a32a; border-color: #00a32a; text-shadow: none;">';
+        echo '🚀 Zum Import-Dashboard';
+        echo '</a>';
+        echo '</div>';
+    }
+
+    // NEU: Erfolgs- oder Fehlermeldung für den Template-Generator
+    if ( isset( $action_result ) && is_array( $action_result ) ) {
+        $notice_class   = $action_result['success'] ? 'notice-success' : 'notice-error';
+        $notice_message = $action_result['message'];
+        echo '<div class="notice ' . esc_attr( $notice_class ) . ' is-dismissible"><p>' . wp_kses_post( $notice_message ) . '</p></div>';
+    }
+    ?>
 
 	<form method="post" action="options.php">
 		<?php
 		settings_fields( 'csv_import_settings' );
 		?>
-		
-		<!-- 🎯 NEUES FLEXIBLES SETTINGS GRID -->
+
 		<div class="csv-settings-dashboard">
 
-			<!-- ROW 1: Basis-Konfiguration & Quellen -->
 			<div class="csv-import-box settings-box">
 				<h3>
 					<span class="step-number completed">1</span>
@@ -46,7 +50,7 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 					Basis-Konfiguration
 				</h3>
 				<span class="status-indicator status-success">✅ Grundeinstellungen</span>
-				
+
 				<table class="form-table compact-form" role="presentation">
 					<tbody>
 						<tr>
@@ -65,13 +69,14 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 							<td>
 								<select id="csv_import_page_builder" name="csv_import_page_builder">
 									<?php
+									$current_pb = get_option('csv_import_page_builder', 'gutenberg');
 									$pb_options = [
-    'gutenberg' => 'Gutenberg (Standard)',
-    'elementor' => 'Elementor',
-    'wpbakery' => 'WPBakery',
-    'breakdance' => 'Breakdance', 
-    'enfold' => 'Enfold'        
-];
+                                        'gutenberg' => 'Gutenberg (Standard)',
+                                        'elementor' => 'Elementor',
+                                        'wpbakery' => 'WPBakery',
+                                        'breakdance' => 'Breakdance',
+                                        'enfold' => 'Enfold'
+                                    ];
 									foreach ( $pb_options as $val => $label ) {
 										echo '<option value="' . esc_attr( $val ) . '" ' . selected( $current_pb, $val, false ) . '>' . esc_html( $label ) . '</option>';
 									}
@@ -118,19 +123,19 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 					<span class="step-icon">🔗</span>
 					CSV-Quellen
 				</h3>
-				
-				<?php 
+
+				<?php
 				$dropbox_url = get_option( 'csv_import_dropbox_url' );
 				$local_path = get_option( 'csv_import_local_path', 'data/landingpages.csv' );
 				$has_sources = !empty($dropbox_url) || !empty($local_path);
 				?>
-				
+
 				<?php if ( $has_sources ) : ?>
 					<span class="status-indicator status-success">✅ Quellen konfiguriert</span>
 				<?php else : ?>
 					<span class="status-indicator status-error">❌ Keine Quellen</span>
 				<?php endif; ?>
-				
+
 				<table class="form-table compact-form" role="presentation">
 					<tbody>
 						<tr>
@@ -169,7 +174,6 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 				</table>
 			</div>
 
-			<!-- ROW 2: Medien & SEO -->
 			<div class="csv-import-box settings-box">
 				<h3>
 					<span class="step-number completed">3</span>
@@ -177,7 +181,7 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 					Medien-Einstellungen
 				</h3>
 				<span class="status-indicator status-active">⚙️ Medien-Konfiguration</span>
-				
+
 				<table class="form-table compact-form" role="presentation">
 					<tbody>
 						<tr>
@@ -217,7 +221,7 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 					SEO & Erweitert
 				</h3>
 				<span class="status-indicator status-active">🎯 SEO-Einstellungen</span>
-				
+
 				<table class="form-table compact-form" role="presentation">
 					<tbody>
 						<tr>
@@ -252,7 +256,7 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 								</label>
 							</td>
 						</tr>
-<tr>
+                        <tr>
 							<th scope="row">Suchmaschinen</th>
 							<td>
 								<label>
@@ -266,37 +270,78 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 					</tbody>
 				</table>
 			</div>
+            
+            <div class="csv-import-box settings-box" style="grid-column: 1 / -1;">
+                <h3>
+                    <span class="step-icon">✨</span>
+                    Automatischer Template-Generator
+                </h3>
+                <span class="status-indicator status-active">Automatisierung</span>
 
-			<!-- ROW 3: Test & Validierung -->
-			<div class="csv-import-box settings-box">
+                <p>Erstellen Sie automatisch ein neues Import-Template. Das Plugin liest die Spalten Ihrer CSV-Datei aus und fügt alle verfügbaren Platzhalter in eine Kopie Ihres Basis-Designs ein.</p>
+
+                <form method="post">
+                    <?php wp_nonce_field( 'csv_import_generate_template' ); ?>
+                    <input type="hidden" name="action" value="generate_template_from_csv">
+
+                    <table class="form-table compact-form" role="presentation">
+                        <tbody>
+                            <tr>
+                                <th scope="row"><label for="base_template_id">Basis-Post ID</label></th>
+                                <td>
+                                    <input type="number" id="base_template_id" name="base_template_id" class="small-text" required placeholder="z.B. 123">
+                                    <p class="description">
+                                        ID der Seite/des Beitrags, dessen Design als Grundlage dienen soll.
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><label for="new_template_name">Name des neuen Templates</label></th>
+                                <td>
+                                    <input type="text" id="new_template_name" name="new_template_name" class="regular-text" required placeholder="z.B. Landingpage Vorlage V2">
+                                    <p class="description">
+                                        Wie soll das neue Template (als Entwurf) heißen?
+                                    </p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="action-buttons" style="margin-top: 15px;">
+                        <?php submit_button( 'Template generieren', 'primary', 'submit_generate_template', false ); ?>
+                    </div>
+                </form>
+            </div>
+
+
+			<div class="csv-import-box settings-box" style="grid-column: 1 / -1;">
 				<h3>
 					<span class="step-number active">5</span>
 					<span class="step-icon">🧪</span>
-					Konfiguration testen
+					Konfiguration testen &amp; CSV validieren
 				</h3>
 				<span class="status-indicator status-pending">⏳ Bereit für Tests</span>
-				
-				<p>Überprüfen Sie Ihre Einstellungen und die CSV-Dateien vor dem Import.</p>
-				
+
+				<p>Überprüfen Sie Ihre Einstellungen und die CSV-Dateien vor dem eigentlichen Import. Nach einer erfolgreichen Validierung erscheinen hier Beispieldaten und die Spaltenzuordnung.</p>
+
 				<div class="action-buttons">
 					<button type="button" class="button button-secondary" onclick="csvImportTestConfig()">⚙️ Konfiguration prüfen</button>
 					<button type="button" class="button button-secondary" onclick="csvImportValidateCSV('dropbox')">📊 Dropbox CSV validieren</button>
 					<button type="button" class="button button-secondary" onclick="csvImportValidateCSV('local')">📁 Lokale CSV validieren</button>
 				</div>
-				
+
 				<div id="csv-test-results" class="test-results-container"></div>
 			</div>
-
-			<div class="csv-import-box settings-box">
+            
+            <div class="csv-import-box settings-box">
 				<h3>
 					<span class="step-number">6</span>
 					<span class="step-icon">📊</span>
 					CSV Beispieldaten
 				</h3>
 				<span class="status-indicator status-pending">📄 Daten-Vorschau</span>
-				
+
 				<p class="description">Nach einer erfolgreichen CSV-Validierung werden hier die ersten Zeilen angezeigt.</p>
-				
+
 				<div id="csv-sample-data-container" class="sample-data-container">
 					<div class="info-message">
 						<strong>Info:</strong> Führen Sie zuerst eine CSV-Validierung durch, um Beispieldaten zu sehen.
@@ -304,68 +349,65 @@ if ( isset( $_GET['settings-updated'] ) && $_GET['settings-updated'] ) {
 				</div>
 			</div>
 
-<div id="csv-column-mapping-container" class="csv-import-box settings-box" style="display:none; grid-column: 1 / -1;">
-    <h3>
-        <span class="step-number active">7</span>
-        <span class="step-icon">🔄</span>
-        Spalten zuordnen
-    </h3>
-    <span class="status-indicator status-active">Mapping aktiv</span>
-    <div id="mapping-table-target"></div>
-</div>
-
-<div id="csv-column-mapping-container" class="csv-import-box settings-box" style="display:none;">
-    </div>
-
-<div id="csv-live-preview-container" class="csv-import-box settings-box" style="display:none;">
-    <h3>
-        <span class="step-number active">8</span>
-        <span class="step-icon">👀</span>
-        Live-Vorschau
-    </h3>
-    <p>Dies ist eine Vorschau, wie Ihr Template mit den Daten aus der ersten Zeile Ihrer CSV-Datei aussehen wird, inklusive einer SEO-Analyse.</p>
-
-    <div class="action-buttons" style="margin-bottom: 20px;">
-        <button type="button" id="csv-generate-preview-btn" class="button button-primary button-large">
-             Vorschau generieren / aktualisieren
-        </button>
-    </div>
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
-        
-        <div>
-            <h4>Template-Vorschau</h4>
-            <div id="csv-preview-content" class="seo-preview-container mobile-view" style="margin-top: 5px; min-height: 200px;">
-                <div class="info-message" style="margin: 0;">Klicken Sie auf "Vorschau generieren", um das Ergebnis zu sehen.</div>
+            <div id="csv-column-mapping-container" class="csv-import-box settings-box" style="display:none;">
+                <h3>
+                    <span class="step-number active">7</span>
+                    <span class="step-icon">🔄</span>
+                    Spalten zuordnen
+                </h3>
+                <span class="status-indicator status-active">Mapping aktiv</span>
+                <div id="mapping-table-target"></div>
             </div>
-        </div>
 
-        <div>
-            <h4>SEO-Analyse</h4>
-            <?php if (class_exists('CSV_Import_SEO_Preview')) : ?>
-                <div class="seo-metrics" style="margin-top: 5px;">
-                    <div class="metric-row">
-                        <span>Titel-Länge:</span>
-                        <span class="metric-value" id="title-length-metric">0 Zeichen</span>
+            <div id="csv-live-preview-container" class="csv-import-box settings-box" style="display:none; grid-column: 1 / -1;">
+                <h3>
+                    <span class="step-number active">8</span>
+                    <span class="step-icon">👀</span>
+                    Live-Vorschau
+                </h3>
+                <p>Dies ist eine Vorschau, wie Ihr Template mit den Daten aus der ersten Zeile Ihrer CSV-Datei aussehen wird, inklusive einer SEO-Analyse.</p>
+
+                <div class="action-buttons" style="margin-bottom: 20px;">
+                    <button type="button" id="csv-generate-preview-btn" class="button button-primary button-large">
+                        Vorschau generieren / aktualisieren
+                    </button>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;">
+
+                    <div>
+                        <h4>Template-Vorschau</h4>
+                        <div id="csv-preview-content" class="seo-preview-container mobile-view" style="margin-top: 5px; min-height: 200px;">
+                            <div class="info-message" style="margin: 0;">Klicken Sie auf "Vorschau generieren", um das Ergebnis zu sehen.</div>
+                        </div>
                     </div>
-                    <div class="metric-row">
-                        <span>Description-Länge:</span>
-                        <span class="metric-value" id="desc-length-metric">0 Zeichen</span>
-                    </div>
-                    <div class="metric-row">
-                        <span>SEO-Score:</span>
-                        <span class="metric-value" id="seo-score-metric">...</span>
+
+                    <div>
+                        <h4>SEO-Analyse</h4>
+                        <?php if (class_exists('CSV_Import_SEO_Preview')) : ?>
+                            <div class="seo-metrics" style="margin-top: 5px;">
+                                <div class="metric-row">
+                                    <span>Titel-Länge:</span>
+                                    <span class="metric-value" id="title-length-metric">0 Zeichen</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span>Description-Länge:</span>
+                                    <span class="metric-value" id="desc-length-metric">0 Zeichen</span>
+                                </div>
+                                <div class="metric-row">
+                                    <span>SEO-Score:</span>
+                                    <span class="metric-value" id="seo-score-metric">...</span>
+                                </div>
+                            </div>
+                            <div class="seo-recommendations" id="seo-recommendations" style="margin-top: 15px;"></div>
+                        <?php endif; ?>
                     </div>
                 </div>
-                <div class="seo-recommendations" id="seo-recommendations" style="margin-top: 15px;"></div>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-		<!-- Save Button -->
-		<div class="csv-dashboard-footer">
-			<?php submit_button( '💾 Einstellungen speichern', 'primary large', 'submit', false ); ?>
-			
+            </div>
+
+		</div> <div class="csv-dashboard-footer">
+			<?php submit_button( '💾 Einstellungen speichern', 'primary large', 'submit', false, ['id' => 'submit-main-settings'] ); ?>
+
 			<div style="margin-top: 15px;">
 				<p>
 					💡 <strong>Tipp:</strong> Testen Sie Ihre Konfiguration nach dem Speichern mit den Validierungs-Buttons.
