@@ -9,15 +9,44 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class CSV_Import_SEO_Preview {
+
+    /**
+     * Holt das gespeicherte Mapping der SEO-Felder zu CSV-Spalten.
+     * @return array
+     */
+    public static function get_seo_field_mapping(): array {
+        return get_option('csv_import_seo_field_mapping', [
+            'title' => '',
+            'description' => '',
+            'keywords' => '',
+            'canonical_url' => '',
+            'og_title' => '',
+            'og_description' => ''
+        ]);
+    }
+
+    /**
+     * Gibt eine Liste der verfügbaren Spalten aus der zuletzt validierten CSV zurück.
+     * @return array
+     */
+    public static function get_available_csv_columns(): array {
+        // Versucht, die Header aus der letzten CSV-Validierung zu bekommen
+        if (function_exists('csv_import_get_last_parsed_data')) {
+            $last_data = csv_import_get_last_parsed_data();
+            if (!empty($last_data['headers'])) {
+                return $last_data['headers'];
+            }
+        }
+        // Fallback-Liste, falls keine CSV-Daten vorhanden sind
+        return ['post_title', 'post_content', 'post_excerpt', 'seo_title', 'seo_description'];
+    }
     
     public static function init() {
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
         add_action('wp_ajax_csv_seo_preview_validate', [__CLASS__, 'ajax_validate_seo']);
     }
     
-    /**
-     * Lädt CSS/JS für SEO Preview
-     */
+   
     public static function enqueue_assets($hook) {
         if (strpos($hook, 'csv-import') === false) return;
         
