@@ -4,6 +4,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Direkten Zugriff verhindern
 }
 
+/**
+ * Verwaltet alle Operationen im Zusammenhang mit Import-Templates.
+ * Version 2.1 - Syntax-Korrektur und finale Überprüfung.
+ */
 class CSV_Import_Template_Manager {
 
     /**
@@ -35,7 +39,6 @@ class CSV_Import_Template_Manager {
         // 3. CSV-Header auslesen
         try {
             $config = csv_import_get_config();
-            // Priorität für die Quellenauswahl: Dropbox, dann lokal.
             $source = !empty($config['dropbox_url']) && filter_var($config['dropbox_url'], FILTER_VALIDATE_URL) ? 'dropbox' : 'local';
             $csv_data = csv_import_load_csv_data($source, $config);
 
@@ -67,7 +70,7 @@ class CSV_Import_Template_Manager {
         $new_post_data = [
             'post_title'   => sanitize_text_field($new_template_name),
             'post_content' => $base_post->post_content . $placeholder_block,
-            'post_status'  => 'draft', // Immer als Entwurf speichern, um versehentliches Veröffentlichen zu verhindern
+            'post_status'  => 'draft',
             'post_type'    => $base_post->post_type,
             'post_author'  => get_current_user_id(),
         ];
@@ -75,14 +78,13 @@ class CSV_Import_Template_Manager {
         // 6. Neuen Post in die Datenbank einfügen
         $new_post_id = wp_insert_post($new_post_data, true);
         if (is_wp_error($new_post_id)) {
-            return $new_post_id; // Gibt das WP_Error-Objekt direkt zurück
+            return $new_post_id;
         }
 
         // 7. Alle Metadaten vom Basis-Post zum neuen Post kopieren
         $meta_data = get_post_meta($base_post_id);
         if (!empty($meta_data) && is_array($meta_data)) {
             foreach ($meta_data as $meta_key => $meta_values) {
-                // Spezielle Metadaten überspringen, die von WordPress verwaltet werden und eindeutig sein müssen
                 if (in_array($meta_key, ['_wp_old_slug', '_edit_lock', '_edit_last', '_thumbnail_id'])) {
                     continue;
                 }
@@ -92,7 +94,6 @@ class CSV_Import_Template_Manager {
             }
         }
         
-        // Featured Image vom Basis-Post kopieren, falls vorhanden
         $thumbnail_id = get_post_thumbnail_id($base_post_id);
         if ($thumbnail_id) {
             set_post_thumbnail($new_post_id, $thumbnail_id);
@@ -103,7 +104,6 @@ class CSV_Import_Template_Manager {
 
     /**
      * Wendet Platzhalter auf den Inhalt eines Templates an.
-     * (Bestehende Funktionalität, beibehalten für Kompatibilität)
      *
      * @param int   $template_id Die ID des Template-Posts.
      * @param array $data        Die Datenzeile aus der CSV.
