@@ -353,28 +353,6 @@ class CSV_Import_Template_Manager {
         }
     }
 
-
-    // ... Restliche Methoden bleiben unverändert ...
-
-    /**
-     * Wendet Platzhalter auf den Inhalt eines Templates an.
-     */
-    public static function apply_placeholders_to_content(int $template_id, array $data) {
-        $template_post = get_post($template_id);
-        if (!$template_post) {
-            return new WP_Error('template_not_found', 'Template mit ID ' . $template_id . ' nicht gefunden.');
-        }
-
-        $content = $template_post->post_content;
-        
-        // Platzhalter ersetzen
-        foreach ($data as $key => $value) {
-            $placeholder = '{{' . trim($key) . '}}';
-            $content = str_replace($placeholder, wp_kses_post($value), $content);
-        }
-        
-        return $content;
-    }
     
     /**
      * Debug-Funktion um verfügbare CSV-Header zu testen
