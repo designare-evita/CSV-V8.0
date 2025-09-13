@@ -1,21 +1,21 @@
 <?php
 
 if ( ! defined( 'ABSPATH' ) ) {
+
 	exit; // Direkten Zugriff verhindern
 }
 
 /**
  * Verwaltet alle Operationen im Zusammenhang mit Import-Templates.
- * Version 4.0 - MIT COPY/PASTE FUNKTIONALITÄT für CSV-Platzhalter
+ * Version 5.0 - GUTENBERG/BLOCK EDITOR KOMPATIBLE VERSION
  */
 class CSV_Import_Template_Manager {
 
     /**
-     * Erstellt ein neues Template, indem es einen Basis-Post dupliziert
-     * und alle Platzhalter aus der konfigurierten CSV-Datei anhängt.
+     * Erstellt ein neues Template mit Block Editor kompatiblen Platzhaltern
      */
     public static function create_template_from_csv_headers(int $base_post_id, string $new_template_name) {
-        // 1. Prüfen, ob die benötigten Core-Funktionen existieren
+        // Basis-Validierung bleibt gleich
         if (!function_exists('csv_import_get_config')) {
             return new WP_Error(
                 'missing_core_functions',
@@ -23,21 +23,6 @@ class CSV_Import_Template_Manager {
             );
         }
 
-        if (!function_exists('csv_import_validate_config')) {
-            return new WP_Error(
-                'missing_validation_function',
-                'csv_import_validate_config Funktion ist nicht verfügbar.'
-            );
-        }
-
-        if (!function_exists('csv_import_validate_csv_source')) {
-            return new WP_Error(
-                'missing_csv_validation_function',
-                'csv_import_validate_csv_source Funktion ist nicht verfügbar.'
-            );
-        }
-
-        // 2. Basis-Post abrufen und validieren
         $base_post = get_post($base_post_id);
         if (!$base_post) {
             return new WP_Error(
@@ -46,11 +31,9 @@ class CSV_Import_Template_Manager {
             );
         }
 
-        // 3. CSV-Header direkt über Konfiguration und Validierung auslesen
+        // CSV-Header laden (bestehende Logik)
         try {
             $config = csv_import_get_config();
-            
-            // Plugin-Konfiguration validieren
             $validation = csv_import_validate_config($config);
             
             if (!$validation['valid']) {
@@ -58,7 +41,6 @@ class CSV_Import_Template_Manager {
                 throw new Exception('Plugin-Konfiguration ungültig: ' . $error_details);
             }
             
-            // Bestimme die beste verfügbare CSV-Quelle
             $source = null;
             $source_name = '';
             
@@ -69,10 +51,9 @@ class CSV_Import_Template_Manager {
                 $source = 'local';
                 $source_name = 'Lokale Datei';
             } else {
-                throw new Exception('Keine gültige CSV-Quelle konfiguriert oder verfügbar. Bitte konfigurieren Sie eine Dropbox-URL oder einen lokalen CSV-Pfad in den Plugin-Einstellungen.');
+                throw new Exception('Keine gültige CSV-Quelle konfiguriert.');
             }
             
-            // CSV-Quelle validieren um Header zu bekommen
             $csv_validation = csv_import_validate_csv_source($source, $config);
             
             if (!$csv_validation['valid']) {
@@ -93,13 +74,13 @@ class CSV_Import_Template_Manager {
             );
         }
 
-        // 4. Platzhalter-Block für den Editor generieren (MIT COPY/PASTE)
-        $placeholder_block = self::generate_copyable_placeholder_block($headers, $source_name);
+        // KORRIGIERT: Block Editor kompatible Platzhalter generieren
+        $placeholder_content = self::generate_gutenberg_compatible_placeholders($headers, $source_name);
 
-        // 5. Neuen Post-Datensatz vorbereiten
+        // Neuen Post-Datensatz vorbereiten
         $new_post_data = [
             'post_title'   => sanitize_text_field($new_template_name),
-            'post_content' => $base_post->post_content . $placeholder_block,
+            'post_content' => $base_post->post_content . $placeholder_content,
             'post_status'  => 'draft',
             'post_type'    => $base_post->post_type,
             'post_author'  => get_current_user_id(),
@@ -107,7 +88,7 @@ class CSV_Import_Template_Manager {
             'ping_status'    => $base_post->ping_status,
         ];
 
-        // 6. Neuen Post in die Datenbank einfügen
+        // Post erstellen
         $new_post_id = wp_insert_post($new_post_data, true);
         if (is_wp_error($new_post_id)) {
             return new WP_Error(
@@ -116,271 +97,140 @@ class CSV_Import_Template_Manager {
             );
         }
 
-        // 7. Alle Metadaten vom Basis-Post zum neuen Post kopieren
+        // Metadaten kopieren und hinzufügen
         self::copy_post_metadata($base_post_id, $new_post_id);
-        
-        // 8. Template-spezifische Meta-Daten hinzufügen
         self::add_template_metadata($new_post_id, $base_post_id, $headers, $source);
         
-        // 9. Erfolg loggen
+        // Erfolg loggen
         self::log_template_creation($new_post_id, $new_template_name, $base_post_id, $source, count($headers));
 
         return $new_post_id;
     }
 
     /**
-     * 🔥 NEUE FUNKTION: Generiert interaktive Platzhalter mit Copy/Paste-Funktionalität
+     * 🔥 KORRIGIERTE FUNKTION: Generiert Gutenberg/Block Editor kompatible Platzhalter
+     * Diese Version überlebt den Block Editor!
      */
-    private static function generate_copyable_placeholder_block(array $headers, string $source_name): string {
-        $placeholder_block = "\n\n<!-- =================================== -->\n";
-        $placeholder_block .= "<!-- CSV Import Template Platzhalter -->\n";
-        $placeholder_block .= "<!-- Quelle: {$source_name} -->\n";
-        $placeholder_block .= "<!-- Generiert am: " . current_time('Y-m-d H:i:s') . " -->\n";
-        $placeholder_block .= "<!-- =================================== -->\n\n";
+    private static function generate_gutenberg_compatible_placeholders(array $headers, string $source_name): string {
+        $current_time = current_time('Y-m-d H:i:s');
         
-        // 🎨 Moderner Container mit JavaScript für Copy-Funktionalität
-        $placeholder_block .= '<div class="csv-import-placeholders" id="csv-placeholder-container" style="border: 3px dashed #0073aa; padding: 30px; margin: 30px 0; background: linear-gradient(135deg, #f0f6fc 0%, #e8f4fd 100%); border-radius: 12px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; position: relative;">' . "\n";
+        // LÖSUNG 1: Verwende HTML-Block mit korrekter Gutenberg-Syntax
+        $block_content = "\n\n<!-- wp:html -->\n";
+        $block_content .= '<div id="csv-import-placeholders-' . uniqid() . '" class="csv-import-placeholders-widget" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; margin: 30px 0; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">' . "\n";
         
-        // Header mit Gesamt-Copy-Button
-        $placeholder_block .= '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">' . "\n";
-        $placeholder_block .= '<h2 style="color: #0073aa; margin: 0; font-size: 28px; display: flex; align-items: center;"><span style="margin-right: 10px;">🔗</span> CSV Import Platzhalter</h2>' . "\n";
-        $placeholder_block .= '<div>' . "\n";
-        $placeholder_block .= '<button type="button" onclick="copyAllPlaceholders()" style="background: #00a32a; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-right: 10px; font-size: 14px;">📋 Alle kopieren</button>' . "\n";
-        $placeholder_block .= '<button type="button" onclick="togglePlaceholderContainer()" style="background: #f56e28; color: white; border: none; padding: 10px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px;">👁️ Ein/Ausblenden</button>' . "\n";
-        $placeholder_block .= '</div>' . "\n";
-        $placeholder_block .= '</div>' . "\n";
+        // Header-Bereich mit modernem Design
+        $block_content .= '<div style="text-align: center; margin-bottom: 30px;">' . "\n";
+        $block_content .= '<h2 style="color: white; margin: 0 0 10px 0; font-size: 32px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.3);"><span style="margin-right: 10px;">🚀</span>CSV Import Platzhalter</h2>' . "\n";
+        $block_content .= '<p style="margin: 0; opacity: 0.9; font-size: 18px;">Quelle: ' . esc_html($source_name) . ' | Generiert: ' . $current_time . '</p>' . "\n";
+        $block_content .= '</div>' . "\n";
         
-        $placeholder_block .= '<p style="margin: 0 0 25px 0; color: #646970; font-size: 16px; line-height: 1.6;">Diese Platzhalter werden beim Import automatisch durch die entsprechenden CSV-Werte ersetzt. <strong>Klicken Sie auf einen Platzhalter, um ihn zu kopieren!</strong></p>' . "\n\n";
+        // Info-Box mit Anweisungen
+        $block_content .= '<div style="background: rgba(255,255,255,0.15); border-radius: 10px; padding: 20px; margin-bottom: 30px; backdrop-filter: blur(10px);">' . "\n";
+        $block_content .= '<h3 style="color: white; margin: 0 0 15px 0; font-size: 20px;">💡 Verwendung:</h3>' . "\n";
+        $block_content .= '<ol style="margin: 0; padding-left: 20px; color: white; line-height: 1.8;">' . "\n";
+        $block_content .= '<li><strong>Markieren</strong> Sie den gewünschten Platzhalter mit der Maus</li>' . "\n";
+        $block_content .= '<li><strong>Kopieren</strong> Sie ihn (Strg+C / Cmd+C)</li>' . "\n";
+        $block_content .= '<li><strong>Fügen Sie ihn</strong> in Ihr Template ein (Strg+V / Cmd+V)</li>' . "\n";
+        $block_content .= '<li>Beim Import werden alle Platzhalter automatisch durch CSV-Werte ersetzt</li>' . "\n";
+        $block_content .= '</ol>' . "\n";
+        $block_content .= '</div>' . "\n";
         
-        // 🎯 Suchfunktion für viele Platzhalter
-        if (count($headers) > 10) {
-            $placeholder_block .= '<div style="margin-bottom: 20px;">' . "\n";
-            $placeholder_block .= '<input type="text" id="placeholder-search" onkeyup="filterPlaceholders()" placeholder="🔍 Platzhalter suchen..." style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; background: white;">' . "\n";
-            $placeholder_block .= '</div>' . "\n";
-        }
+        // Kopier-Button für alle Platzhalter
+        $all_placeholders = array_map(function($header) {
+            return '{{' . trim($header) . '}}';
+        }, array_filter($headers, 'trim'));
         
-        // Platzhalter-Grid mit Copy-Buttons
-        $placeholder_block .= '<div id="placeholder-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">' . "\n";
+        $all_placeholders_text = implode(' ', $all_placeholders);
+        
+        $block_content .= '<div style="text-align: center; margin-bottom: 30px;">' . "\n";
+        $block_content .= '<button type="button" onclick="navigator.clipboard.writeText(\'' . esc_js($all_placeholders_text) . '\').then(function(){alert(\'✅ Alle ' . count($all_placeholders) . ' Platzhalter kopiert!\');}).catch(function(){prompt(\'Kopieren Sie diesen Text:\', \'' . esc_js($all_placeholders_text) . '\');});" style="background: linear-gradient(45deg, #ff6b6b, #feca57); color: white; border: none; padding: 15px 30px; border-radius: 50px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s;" onmouseover="this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.transform=\'translateY(0)\'">📋 ALLE PLATZHALTER KOPIEREN</button>' . "\n";
+        $block_content .= '</div>' . "\n";
+        
+        // Platzhalter-Grid
+        $block_content .= '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">' . "\n";
         
         foreach ($headers as $index => $header) {
             if (!empty(trim($header))) {
                 $clean_header = trim($header);
-                $placeholder_text = '{{' . $clean_header . '}}';
-                $card_id = 'placeholder-card-' . $index;
+                $placeholder = '{{' . $clean_header . '}}';
+                $usage_hint = self::get_usage_hint($clean_header);
                 
-                $placeholder_block .= '<div class="placeholder-card" id="' . $card_id . '" style="background: white; padding: 20px; border-radius: 10px; border-left: 5px solid #00a32a; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: all 0.3s ease; cursor: pointer; position: relative;" onclick="copyPlaceholder(\'' . esc_js($placeholder_text) . '\', \'' . $card_id . '\')" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.15)\'; this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.1)\'; this.style.transform=\'translateY(0)\'">' . "\n";
+                $block_content .= '<div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2);">' . "\n";
                 
-                // Header-Info
-                $placeholder_block .= '<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">' . "\n";
-                $placeholder_block .= '<div style="display: flex; align-items: center;">' . "\n";
-                $placeholder_block .= '<span style="background: #00a32a; color: white; padding: 6px 10px; border-radius: 50%; font-size: 12px; font-weight: bold; margin-right: 12px; min-width: 24px; text-align: center;">' . ($index + 1) . '</span>' . "\n";
-                $placeholder_block .= '<strong style="color: #1d2327; font-size: 16px;">' . esc_html($clean_header) . '</strong>' . "\n";
-                $placeholder_block .= '</div>' . "\n";
-                $placeholder_block .= '<div class="copy-indicator" id="copy-indicator-' . $card_id . '" style="opacity: 0; color: #00a32a; font-weight: bold; font-size: 12px; transition: opacity 0.3s ease;">✅ KOPIERT!</div>' . "\n";
-                $placeholder_block .= '</div>' . "\n";
+                // Header mit Nummer
+                $block_content .= '<div style="display: flex; align-items: center; margin-bottom: 15px;">' . "\n";
+                $block_content .= '<div style="background: #4ecdc4; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 15px; flex-shrink: 0;">' . ($index + 1) . '</div>' . "\n";
+                $block_content .= '<h4 style="color: white; margin: 0; font-size: 16px; font-weight: 600;">' . esc_html($clean_header) . '</h4>' . "\n";
+                $block_content .= '</div>' . "\n";
                 
-                // Platzhalter-Code (selectable)
-                $placeholder_block .= '<div style="background: #f8f9fa; border: 2px dashed #dee2e6; padding: 15px; border-radius: 8px; margin-bottom: 12px; position: relative;">' . "\n";
-                $placeholder_block .= '<code id="placeholder-text-' . $card_id . '" style="background: transparent; padding: 0; font-size: 16px; color: #d63638; font-weight: 600; font-family: \'Consolas\', Monaco, monospace; word-break: break-all; user-select: all;">' . esc_html($placeholder_text) . '</code>' . "\n";
-                $placeholder_block .= '<div style="position: absolute; top: 8px; right: 8px; background: #0073aa; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">KLICKEN = KOPIEREN</div>' . "\n";
-                $placeholder_block .= '</div>' . "\n";
+                // Platzhalter-Code (selektierbar)
+                $block_content .= '<div style="background: rgba(0,0,0,0.3); border: 1px dashed rgba(255,255,255,0.3); border-radius: 8px; padding: 15px; margin-bottom: 10px; position: relative;">' . "\n";
+                $block_content .= '<code style="color: #feca57; font-size: 14px; font-weight: 600; word-break: break-all; user-select: all; background: transparent; padding: 0;">' . esc_html($placeholder) . '</code>' . "\n";
+                
+                // Kopier-Button für einzelnen Platzhalter
+                $block_content .= '<button type="button" onclick="navigator.clipboard.writeText(\'' . esc_js($placeholder) . '\').then(function(){this.textContent=\'✅ KOPIERT!\'; setTimeout(() => this.textContent=\'📋 KOPIEREN\', 2000);}.bind(this)).catch(function(){prompt(\'Kopieren Sie diesen Text:\', \'' . esc_js($placeholder) . '\');});" style="position: absolute; top: 5px; right: 5px; background: #4ecdc4; color: white; border: none; padding: 5px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer;">📋 KOPIEREN</button>' . "\n";
+                $block_content .= '</div>' . "\n";
                 
                 // Verwendungshinweis
-                $usage_hint = self::get_usage_hint($clean_header);
                 if ($usage_hint) {
-                    $placeholder_block .= '<div style="font-size: 13px; color: #6c757d; line-height: 1.4;"><strong>💡 Verwendung:</strong> ' . esc_html($usage_hint) . '</div>' . "\n";
+                    $block_content .= '<p style="margin: 0; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.4;"><strong>💡 Verwendung:</strong> ' . esc_html($usage_hint) . '</p>' . "\n";
                 }
                 
-                $placeholder_block .= '</div>' . "\n";
+                $block_content .= '</div>' . "\n";
             }
         }
         
-        $placeholder_block .= '</div>' . "\n\n";
+        $block_content .= '</div>' . "\n";
         
-        // 📋 Schnell-Kopieren-Liste für häufige Platzhalter
+        // Häufige Platzhalter (Quick Access)
         $common_placeholders = self::get_common_placeholders($headers);
         if (!empty($common_placeholders)) {
-            $placeholder_block .= '<div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin-top: 25px;">' . "\n";
-            $placeholder_block .= '<h4 style="color: #856404; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center;"><span style="margin-right: 8px;">⚡</span> Häufig verwendete Platzhalter:</h4>' . "\n";
-            $placeholder_block .= '<div style="display: flex; flex-wrap: wrap; gap: 10px;">' . "\n";
+            $block_content .= '<div style="background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; margin-bottom: 20px; backdrop-filter: blur(5px);">' . "\n";
+            $block_content .= '<h4 style="color: white; margin: 0 0 15px 0; font-size: 18px;">⚡ Häufig verwendete Platzhalter:</h4>' . "\n";
+            $block_content .= '<div style="display: flex; flex-wrap: wrap; gap: 10px;">' . "\n";
             
             foreach ($common_placeholders as $placeholder) {
-                $placeholder_block .= '<button type="button" onclick="copyPlaceholder(\'' . esc_js($placeholder) . '\', \'quick-copy\')" style="background: #856404; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer;" onmouseover="this.style.background=\'#6f5016\'" onmouseout="this.style.background=\'#856404\'">' . esc_html($placeholder) . '</button>' . "\n";
+                $block_content .= '<button type="button" onclick="navigator.clipboard.writeText(\'' . esc_js($placeholder) . '\').then(function(){this.style.background=\'#00a32a\'; this.textContent=\'✅ KOPIERT\'; setTimeout(() => {this.style.background=\'#4ecdc4\'; this.textContent=\'' . esc_js($placeholder) . '\';}, 2000);}).catch(function(){prompt(\'Kopieren Sie diesen Text:\', \'' . esc_js($placeholder) . '\');});" style="background: #4ecdc4; color: white; border: none; padding: 8px 15px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;">' . esc_html($placeholder) . '</button>' . "\n";
             }
             
-            $placeholder_block .= '</div>' . "\n";
-            $placeholder_block .= '</div>' . "\n";
+            $block_content .= '</div>' . "\n";
+            $block_content .= '</div>' . "\n";
         }
         
-        // 📝 Anweisungen und Tipps
-        $placeholder_block .= '<div style="background: #e7f3ff; border: 1px solid #b3d9ff; padding: 20px; border-radius: 8px; margin-top: 20px;">' . "\n";
-        $placeholder_block .= '<h4 style="color: #0066cc; margin: 0 0 15px 0; font-size: 18px; display: flex; align-items: center;"><span style="margin-right: 8px;">📝</span> Verwendungs-Tipps:</h4>' . "\n";
-        $placeholder_block .= '<ul style="margin: 0; padding-left: 20px; color: #0066cc; line-height: 1.6;">' . "\n";
-        $placeholder_block .= '<li><strong>Klicken Sie auf einen Platzhalter</strong>, um ihn automatisch in die Zwischenablage zu kopieren</li>' . "\n";
-        $placeholder_block .= '<li><strong>Fügen Sie die Platzhalter</strong> in Ihr Template ein (Strg+V / Cmd+V)</li>' . "\n";
-        $placeholder_block .= '<li><strong>Beim Import</strong> werden alle Platzhalter automatisch durch die CSV-Werte ersetzt</li>' . "\n";
-        $placeholder_block .= '<li><strong>Mehrfach-Verwendung:</strong> Sie können jeden Platzhalter mehrmals verwenden</li>' . "\n";
-        $placeholder_block .= '<li><strong>Dieser Block</strong> kann nach dem Kopieren der Platzhalter gelöscht werden</li>' . "\n";
-        $placeholder_block .= '</ul>' . "\n";
-        $placeholder_block .= '</div>' . "\n";
+        // Lösch-Hinweis
+        $block_content .= '<div style="text-align: center; opacity: 0.8;">' . "\n";
+        $block_content .= '<p style="margin: 0; font-size: 14px;">🗑️ Dieser Platzhalter-Block kann nach dem Kopieren der gewünschten Platzhalter gelöscht werden.</p>' . "\n";
+        $block_content .= '</div>' . "\n";
         
-        // 🎯 JavaScript für Copy/Paste-Funktionalität
-        $placeholder_block .= self::generate_copy_paste_javascript();
+        $block_content .= '</div>' . "\n";
+        $block_content .= "<!-- /wp:html -->\n\n";
         
-        $placeholder_block .= '</div>' . "\n\n";
+        // LÖSUNG 2: Zusätzlich ein einfacher Text-Block mit allen Platzhaltern
+        $block_content .= "<!-- wp:heading -->\n";
+        $block_content .= "<h2 class=\"wp-block-heading\">📝 Verfügbare CSV-Platzhalter (Backup-Liste)</h2>\n";
+        $block_content .= "<!-- /wp:heading -->\n\n";
         
-        $placeholder_block .= "<!-- Ende CSV Import Platzhalter -->\n\n";
+        $block_content .= "<!-- wp:paragraph -->\n";
+        $block_content .= "<p><strong>Alle " . count($headers) . " verfügbaren Platzhalter:</strong></p>\n";
+        $block_content .= "<!-- /wp:paragraph -->\n\n";
+        
+        // Platzhalter als normaler Text (falls HTML-Block nicht funktioniert)
+        $block_content .= "<!-- wp:code -->\n";
+        $block_content .= "<pre class=\"wp-block-code\"><code>";
+        foreach ($headers as $header) {
+            if (!empty(trim($header))) {
+                $block_content .= '{{' . esc_html(trim($header)) . '}}, ';
+            }
+        }
+        $block_content = rtrim($block_content, ', ');
+        $block_content .= "</code></pre>\n";
+        $block_content .= "<!-- /wp:code -->\n\n";
 
-        return $placeholder_block;
+        return $block_content;
     }
 
     /**
-     * 🔥 NEUE FUNKTION: Generiert JavaScript für Copy/Paste-Funktionalität
-     */
-    private static function generate_copy_paste_javascript(): string {
-        return '
-<script>
-// 📋 CSV Import Platzhalter Copy/Paste JavaScript
-(function() {
-    // Copy-Funktion für einzelne Platzhalter
-    window.copyPlaceholder = function(text, cardId) {
-        // Moderne Clipboard API verwenden
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(function() {
-                showCopyFeedback(cardId, text);
-            }).catch(function(err) {
-                fallbackCopy(text, cardId);
-            });
-        } else {
-            fallbackCopy(text, cardId);
-        }
-    };
-    
-    // Fallback für ältere Browser
-    function fallbackCopy(text, cardId) {
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        try {
-            document.execCommand("copy");
-            showCopyFeedback(cardId, text);
-        } catch (err) {
-            console.error("Copy fallback failed:", err);
-            alert("Platzhalter kopiert: " + text);
-        }
-        
-        document.body.removeChild(textArea);
-    }
-    
-    // Visuelles Feedback beim Kopieren
-    function showCopyFeedback(cardId, text) {
-        // Copy-Indikator anzeigen
-        const indicator = document.getElementById("copy-indicator-" + cardId);
-        if (indicator) {
-            indicator.style.opacity = "1";
-            setTimeout(function() {
-                indicator.style.opacity = "0";
-            }, 2000);
-        }
-        
-        // Card kurz hervorheben
-        const card = document.getElementById(cardId);
-        if (card) {
-            const originalBorder = card.style.borderLeft;
-            card.style.borderLeft = "5px solid #00a32a";
-            card.style.boxShadow = "0 4px 20px rgba(0, 163, 42, 0.3)";
-            
-            setTimeout(function() {
-                card.style.borderLeft = originalBorder;
-                card.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)";
-            }, 800);
-        }
-        
-        console.log("✅ Platzhalter kopiert:", text);
-    }
-    
-    // Alle Platzhalter kopieren
-    window.copyAllPlaceholders = function() {
-        const placeholderElements = document.querySelectorAll("[id^=\'placeholder-text-\']");
-        const allPlaceholders = Array.from(placeholderElements).map(el => el.textContent);
-        const allText = allPlaceholders.join(" ");
-        
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(allText).then(function() {
-                alert("✅ Alle " + allPlaceholders.length + " Platzhalter kopiert!\\n\\nJetzt können Sie diese in Ihr Template einfügen (Strg+V).");
-            });
-        } else {
-            fallbackCopy(allText, "all");
-            alert("✅ Alle " + allPlaceholders.length + " Platzhalter kopiert!");
-        }
-    };
-    
-    // Container ein/ausblenden
-    window.togglePlaceholderContainer = function() {
-        const grid = document.getElementById("placeholder-grid");
-        const button = event.target;
-        
-        if (grid.style.display === "none") {
-            grid.style.display = "grid";
-            button.textContent = "👁️ Ausblenden";
-            button.style.background = "#f56e28";
-        } else {
-            grid.style.display = "none";
-            button.textContent = "👁️ Einblenden";
-            button.style.background = "#00a32a";
-        }
-    };
-    
-    // Suchfunktion
-    window.filterPlaceholders = function() {
-        const searchTerm = document.getElementById("placeholder-search").value.toLowerCase();
-        const cards = document.querySelectorAll(".placeholder-card");
-        
-        cards.forEach(function(card) {
-            const headerText = card.querySelector("strong").textContent.toLowerCase();
-            const placeholderText = card.querySelector("code").textContent.toLowerCase();
-            
-            if (headerText.includes(searchTerm) || placeholderText.includes(searchTerm)) {
-                card.style.display = "block";
-            } else {
-                card.style.display = "none";
-            }
-        });
-    };
-    
-    // Tastatur-Shortcuts
-    document.addEventListener("keydown", function(e) {
-        // Strg+Shift+C = Alle Platzhalter kopieren
-        if (e.ctrlKey && e.shiftKey && e.key === "C") {
-            e.preventDefault();
-            copyAllPlaceholders();
-        }
-        
-        // Strg+Shift+H = Container ein/ausblenden
-        if (e.ctrlKey && e.shiftKey && e.key === "H") {
-            e.preventDefault();
-            togglePlaceholderContainer();
-        }
-    });
-    
-    console.log("🔗 CSV Import Platzhalter-System geladen!");
-    console.log("💡 Tipps:");
-    console.log("   • Klicken Sie auf Platzhalter zum Kopieren");
-    console.log("   • Strg+Shift+C = Alle kopieren");
-    console.log("   • Strg+Shift+H = Ein/Ausblenden");
-    
-})();
-</script>';
-    }
-
-    /**
-     * 🔥 NEUE FUNKTION: Gibt Verwendungshinweise für spezielle Platzhalter
+     * Gibt Verwendungshinweise für spezielle Platzhalter
      */
     private static function get_usage_hint(string $header): string {
         $hints = [
@@ -422,7 +272,7 @@ class CSV_Import_Template_Manager {
     }
 
     /**
-     * 🔥 NEUE FUNKTION: Ermittelt häufig verwendete Platzhalter
+     * Ermittelt häufig verwendete Platzhalter
      */
     private static function get_common_placeholders(array $headers): array {
         $common_fields = ['post_title', 'title', 'post_content', 'content', 'post_excerpt', 'excerpt', 'featured_image', 'image', 'button_text', 'price', 'link', 'url'];
@@ -445,7 +295,6 @@ class CSV_Import_Template_Manager {
         $meta_data = get_post_meta($source_post_id);
         
         if (!empty($meta_data) && is_array($meta_data)) {
-            // Meta-Keys die NICHT kopiert werden sollen
             $skip_meta_keys = [
                 '_wp_old_slug',
                 '_edit_lock',
@@ -482,7 +331,7 @@ class CSV_Import_Template_Manager {
         update_post_meta($post_id, '_csv_import_template_headers', $headers);
         update_post_meta($post_id, '_csv_import_template_created_at', current_time('mysql'));
         update_post_meta($post_id, '_csv_import_template_created_by', get_current_user_id());
-        update_post_meta($post_id, '_csv_import_template_version', '4.0-copyable');
+        update_post_meta($post_id, '_csv_import_template_version', '5.0-gutenberg-compatible');
         update_post_meta($post_id, '_csv_import_template_header_count', count($headers));
     }
 
@@ -491,7 +340,7 @@ class CSV_Import_Template_Manager {
      */
     private static function log_template_creation(int $template_id, string $template_name, int $base_id, string $source, int $header_count): void {
         if (function_exists('csv_import_log')) {
-            csv_import_log('info', 'Template mit Copy/Paste-Funktionalität erfolgreich generiert', [
+            csv_import_log('info', 'Block Editor kompatibles Template erfolgreich generiert', [
                 'template_id' => $template_id,
                 'template_name' => $template_name,
                 'base_post_id' => $base_id,
@@ -499,10 +348,11 @@ class CSV_Import_Template_Manager {
                 'headers_count' => $header_count,
                 'user_id' => get_current_user_id(),
                 'user_login' => wp_get_current_user()->user_login ?? 'unknown',
-                'version' => '4.0-copyable'
+                'version' => '5.0-gutenberg-compatible'
             ]);
         }
     }
+
 
     // ... Restliche Methoden bleiben unverändert ...
 
@@ -880,22 +730,20 @@ class CSV_Import_Template_Manager {
     /**
      * Wendet ein Template auf Daten an
      */
-    public static function apply_template($template_id, $data) {
-        $template = self::get_template($template_id);
-        if (!$template) {
-            return new WP_Error('template_not_found', 'Template nicht gefunden');
+  public static function apply_placeholders_to_content(int $template_id, array $data) {
+        $template_post = get_post($template_id);
+        if (!$template_post) {
+            return new WP_Error('template_not_found', 'Template mit ID ' . $template_id . ' nicht gefunden.');
         }
+
+        $content = $template_post->post_content;
         
-        // Template-Content mit Daten befüllen
-        $content = $template['post_content'];
+        // Platzhalter ersetzen
         foreach ($data as $key => $value) {
-            $content = str_replace('{{' . $key . '}}', wp_kses_post($value), $content);
+            $placeholder = '{{' . trim($key) . '}}';
+            $content = str_replace($placeholder, wp_kses_post($value), $content);
         }
         
-        return [
-            'post_type' => $template['post_type'],
-            'post_content' => $content,
-            'meta_data' => $template['meta_data']
-        ];
+        return $content;
     }
 }
