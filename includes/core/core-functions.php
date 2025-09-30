@@ -2664,40 +2664,10 @@ function csv_import_ajax_repair_breakdance() {
  * Admin-Notice für Breakdance-Reparatur-Tool
  * Zeigt eine Schaltfläche im Admin-Bereich an
  */
-function csv_import_breakdance_repair_notice() {
-    if ( ! current_user_can( 'manage_options' ) ) {
-        return;
-    }
-    
-    // Nur auf CSV-Import-Seiten anzeigen
-    if ( ! isset( $_GET['page'] ) || strpos( $_GET['page'], 'csv-import' ) === false ) {
-        return;
-    }
-    
-    // Prüfen ob Breakdance aktiviert ist
-    $config = csv_import_get_config();
-    if ( $config['page_builder'] !== 'breakdance' ) {
-        return;
-    }
-    
-    // Zähle Posts die möglicherweise repariert werden müssen
-    global $wpdb;
-    $posts_needing_repair = $wpdb->get_var(
-        "SELECT COUNT(DISTINCT p.ID) 
-         FROM {$wpdb->posts} p
-         INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-         LEFT JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id AND pm2.meta_key = '_breakdance_data'
-         WHERE pm.meta_key = '_csv_import_session'
-         AND pm2.meta_value IS NULL"
-    );
-    
-    if ( $posts_needing_repair > 0 ) {
-        ?>
-        <div class="notice notice-warning">
+<div class="notice notice-warning">
             <p>
                 <strong>Breakdance-Reparatur verfügbar:</strong> 
-                Es wurden <?php echo esc_html( $posts_needing_repair ); ?> importierte Posts gefunden, 
-                die möglicherweise nicht korrekt als Breakdance-Seiten konfiguriert sind.
+                Es wurden <?php echo esc_html( $posts_needing_repair ); ?> importierte Posts gefunden.
             </p>
             <p>
                 <button type="button" class="button button-primary" id="csv-repair-breakdance-btn">
@@ -2728,14 +2698,14 @@ function csv_import_breakdance_repair_notice() {
                             location.reload();
                         }, 2000);
                     } else {
-                        var errorMsg = response.data && response.data.message ? response.data.message : 'Fehler bei der Reparatur';
+                        var errorMsg = response.data && response.data.message ? response.data.message : 'Fehler';
                         resultSpan.html('<span style="color: red;">❌ ' + errorMsg + '</span>');
                         button.prop('disabled', false);
                         button.text('Erneut versuchen');
                     }
                 }).fail(function(jqXHR, textStatus, errorThrown) {
                     console.error('AJAX Fehler:', textStatus, errorThrown);
-                    resultSpan.html('<span style="color: red;">❌ Serverfehler: ' + textStatus + '</span>');
+                    resultSpan.html('<span style="color: red;">❌ Serverfehler</span>');
                     button.prop('disabled', false);
                     button.text('Erneut versuchen');
                 });
@@ -2746,6 +2716,9 @@ function csv_import_breakdance_repair_notice() {
     }
 }
 add_action( 'admin_notices', 'csv_import_breakdance_repair_notice' );
+
+// Hier endet die Datei korrekt:
+csv_import_log( 'debug', 'CSV Import Pro Core Functions geladen - Version 5.2' );
 function csvRepairBreakdance() {
     const button = event.target;
     const resultSpan = document.getElementById('csv-repair-result');
