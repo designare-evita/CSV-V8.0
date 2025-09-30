@@ -1109,3 +1109,49 @@ if (function_exists('csv_import_log')) {
     error_log('CSV Import Pro: AJAX-System komplett geladen - Version 10.0 (korrigiert)');
 }
 
+// ===================================================================
+// BREAKDANCE REPAIR AJAX-HANDLER
+// ===================================================================
+
+/**
+ * AJAX-Handler für die Reparatur von Breakdance-Posts
+ */
+function csv_import_ajax_repair_breakdance(): void {
+    check_ajax_referer('csv_import_ajax', 'nonce');
+    
+    if (!current_user_can('manage_options')) {
+        csv_import_pro_ajax_error('Keine Berechtigung', [], 403);
+    }
+    
+    $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
+    
+    if (!function_exists('csv_import_repair_breakdance_posts')) {
+        csv_import_pro_ajax_error('Reparatur-Funktion nicht verfügbar. Bitte stellen Sie sicher, dass core-functions.php korrekt geladen ist.', [], 500);
+    }
+    
+    try {
+        $result = csv_import_repair_breakdance_posts($post_id);
+        
+        if ($result['success']) {
+            csv_import_pro_ajax_success(
+                $result['message'],
+                [
+                    'repaired' => $result['repaired'],
+                    'errors' => $result['errors'],
+                    'total_checked' => $result['total_checked']
+                ]
+            );
+        } else {
+            csv_import_pro_ajax_error($result['message'], $result);
+        }
+    } catch (Exception $e) {
+        csv_import_pro_ajax_error(
+            'Reparatur fehlgeschlagen: ' . $e->getMessage(),
+            [
+                'post_id' => $post_id,
+                'trace' => $e->getTraceAsString()
+            ],
+            500
+        );
+    }
+}
