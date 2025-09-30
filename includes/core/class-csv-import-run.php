@@ -258,7 +258,6 @@ private function apply_mapping( array $row ): array {
      * @param int $post_id Die ID des neu erstellten Posts.
      * @param array $data Die Datenzeile aus der CSV.
      */
-<?php
 /**
  * KORRIGIERTE apply_page_builder_template() Methode für Breakdance
  * 
