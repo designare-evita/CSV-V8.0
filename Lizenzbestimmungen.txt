@@ -1,0 +1,39 @@
+Lizenzbestimmungen für CSV Import Pro
+Urheberrecht © 2025 Michael Kanda
+
+Alle Rechte vorbehalten.
+
+Diese Lizenzbestimmungen gelten für das WordPress-Plugin "CSV Import Pro" (nachfolgend "die Software" genannt), entwickelt von:
+
+Michael Kanda
+1220 Wien
+E-Mail: michael@designare.at
+
+Durch die Installation, das Kopieren oder die anderweitige Nutzung der Software stimmen Sie den folgenden Bestimmungen zu. Wenn Sie diesen Lizenzbestimmungen nicht zustimmen, dürfen Sie die Software nicht verwenden.
+
+1. Lizenzgewährung
+Ihnen wird eine nicht-exklusive, nicht-übertragbare Lizenz zur Nutzung der Software unter den folgenden Bedingungen gewährt:
+
+Private Nutzung: Die Nutzung der Software für private, nicht-kommerzielle Zwecke ist gestattet.
+
+Kommerzielle Nutzung: Jegliche kommerzielle Nutzung der Software ist ausdrücklich untersagt, es sei denn, es liegt eine schriftliche Zustimmung des Urhebers, Michael Kanda, vor. Als kommerzielle Nutzung gilt unter anderem der Einsatz der Software auf Unternehmenswebsites, in Agenturprojekten oder in jeder Umgebung, die auf die Erzielung eines finanziellen Vorteils ausgerichtet ist.
+
+2. Eigentum
+Die Software ist und bleibt das alleinige geistige Eigentum von Michael Kanda. Diese Lizenz gewährt Ihnen keine Eigentumsrechte an der Software, sondern lediglich ein Nutzungsrecht gemäß diesen Bestimmungen.
+
+3. Weitergabe und Modifikation
+Es ist Ihnen nicht gestattet, die Software oder Teile davon ohne vorherige schriftliche Genehmigung weiterzuverkaufen, zu vermieten oder Unterlizenzen zu vergeben.
+
+Die Dekompilierung, das Reverse Engineering oder die Disassemblierung der Software sind strengstens untersagt.
+
+4. Gewährleistungsausschluss
+DIE SOFTWARE WIRD "WIE BESEHEN" UND OHNE JEGLICHE GEWÄHRLEISTUNG ZUR VERFÜGUNG GESTELLT. DER URHEBER SCHLIESST JEGLICHE AUSDRÜCKLICHE ODER STILLSCHWEIGENDE GEWÄHRLEISTUNG, EINSCHLIESSLICH, ABER NICHT BESCHRÄNKT AUF, DIE GEWÄHRLEISTUNG DER MARKTGÄNGIGKEIT UND DER EIGNUNG FÜR EINEN BESTIMMTEN ZWECK, AUS.
+
+5. Haftungsbeschränkung
+IN KEINEM FALL IST DER URHEBER, MICHAEL KANDA, FÜR DIREKTE, INDIREKTE, ZUFÄLLIGE, SPEZIELLE, EXEMPLARISCHE ODER FOLGESCHÄDEN (EINSCHLIESSLICH, ABER NICHT BESCHRÄNKT AUF, DATENVERLUST, GESCHÄFTSUNTERBRECHUNG ODER ENTGANGENEN GEWINN) HAFTBAR, DIE SICH AUS DER NUTZUNG ODER DER UNFÄHIGKEIT ZUR NUTZUNG DER SOFTWARE ERGEBEN, SELBST WENN AUF DIE MÖGLICHKEIT SOLCHER SCHÄDEN HINGEWIESEN WURDE.
+
+6. Kontakt
+Für Anfragen bezüglich einer kommerziellen Lizenz oder bei sonstigen Fragen zu diesen Bestimmungen kontaktieren Sie bitte:
+
+Michael Kanda
+E-Mail: michael@designare.at
