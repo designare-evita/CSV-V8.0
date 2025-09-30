@@ -2394,5 +2394,340 @@ function csv_import_check_scheduler_dependencies(): array {
     return $summary;
 }
 
+<?php
+/**
+ * Breakdance Reparatur-Tool
+ * 
+ * Diese Funktionen helfen beim Diagnostizieren und Reparieren
+ * von Breakdance-Seiten, die beim CSV-Import nicht korrekt erstellt wurden.
+ * 
+ * Füge diesen Code am Ende von includes/core/core-functions.php hinzu
+ */
+
+/**
+ * Repariert bereits importierte Breakdance-Seiten
+ * 
+ * @param int $post_id ID des zu reparierenden Posts (optional)
+ * @return array Reparatur-Ergebnis
+ */
+function csv_import_repair_breakdance_posts( int $post_id = 0 ): array {
+    $repaired = 0;
+    $errors = 0;
+    $post_ids = [];
+    
+    // Einzelnen Post oder alle CSV-Import-Posts reparieren
+    if ( $post_id > 0 ) {
+        $post_ids = [ $post_id ];
+    } else {
+        // Alle Posts finden, die vom CSV-Import erstellt wurden
+        global $wpdb;
+        $post_ids = $wpdb->get_col(
+            "SELECT post_id FROM {$wpdb->postmeta} 
+             WHERE meta_key = '_csv_import_session' 
+             GROUP BY post_id"
+        );
+    }
+    
+    if ( empty( $post_ids ) ) {
+        return [
+            'success' => false,
+            'message' => 'Keine importierten Posts gefunden',
+            'repaired' => 0,
+            'errors' => 0
+        ];
+    }
+    
+    // Breakdance-Template-ID aus Konfiguration holen
+    $config = csv_import_get_config();
+    if ( empty( $config['template_id'] ) || $config['page_builder'] !== 'breakdance' ) {
+        return [
+            'success' => false,
+            'message' => 'Breakdance nicht als Page Builder konfiguriert oder keine Template-ID gesetzt',
+            'repaired' => 0,
+            'errors' => 0
+        ];
+    }
+    
+    $template_post = get_post( $config['template_id'] );
+    if ( ! $template_post ) {
+        return [
+            'success' => false,
+            'message' => 'Template-Post nicht gefunden (ID: ' . $config['template_id'] . ')',
+            'repaired' => 0,
+            'errors' => 0
+        ];
+    }
+    
+    // Template-Metadaten holen
+    $template_meta = get_post_meta( $template_post->ID );
+    
+    foreach ( $post_ids as $current_post_id ) {
+        try {
+            $post = get_post( $current_post_id );
+            if ( ! $post ) {
+                $errors++;
+                continue;
+            }
+            
+            // 1. Prüfen ob Breakdance-Metadaten vorhanden sind
+            $needs_repair = false;
+            $has_breakdance_data = get_post_meta( $current_post_id, '_breakdance_data', true );
+            $has_breakdance_editable = get_post_meta( $current_post_id, '_breakdance_is_editable', true );
+            
+            if ( empty( $has_breakdance_data ) && empty( $has_breakdance_editable ) ) {
+                $needs_repair = true;
+            }
+            
+            // 2. Prüfen ob Content leer oder kein JSON ist
+            if ( empty( $post->post_content ) || json_decode( $post->post_content, true ) === null ) {
+                $needs_repair = true;
+            }
+            
+            if ( ! $needs_repair ) {
+                continue; // Dieser Post ist OK
+            }
+            
+            // 3. Reparatur durchführen
+            
+            // Breakdance-Aktivierungs-Metadaten setzen
+            update_post_meta( $current_post_id, '_breakdance_data', '1' );
+            update_post_meta( $current_post_id, '_breakdance_is_editable', '1' );
+            update_post_meta( $current_post_id, 'breakdance_data', '1' );
+            
+            // Breakdance-Metadaten vom Template kopieren
+            $breakdance_meta_keys = [
+                '_breakdance_tree_id',
+                '_breakdance_revision_id',
+                '_breakdance_settings',
+                '_breakdance_custom_css',
+                '_breakdance_custom_js',
+                'breakdance_settings',
+                'breakdance_custom_css'
+            ];
+            
+            foreach ( $breakdance_meta_keys as $meta_key ) {
+                if ( isset( $template_meta[$meta_key][0] ) ) {
+                    $meta_value = maybe_unserialize( $template_meta[$meta_key][0] );
+                    update_post_meta( $current_post_id, $meta_key, $meta_value );
+                }
+            }
+            
+            // Content vom Template kopieren (falls leer)
+            if ( empty( $post->post_content ) || json_decode( $post->post_content, true ) === null ) {
+                wp_update_post( [
+                    'ID' => $current_post_id,
+                    'post_content' => $template_post->post_content
+                ] );
+            }
+            
+            // Breakdance-Kategorisierung
+            wp_set_object_terms( $current_post_id, ['breakdance'], 'page_builder_type', false );
+            
+            $repaired++;
+            
+            csv_import_log( 'info', "Breakdance-Post repariert: {$post->post_title} (ID: {$current_post_id})" );
+            
+        } catch ( Exception $e ) {
+            $errors++;
+            csv_import_log( 'error', "Fehler beim Reparieren von Post {$current_post_id}: " . $e->getMessage() );
+        }
+    }
+    
+    return [
+        'success' => $errors === 0,
+        'message' => "{$repaired} Posts repariert, {$errors} Fehler",
+        'repaired' => $repaired,
+        'errors' => $errors,
+        'total_checked' => count( $post_ids )
+    ];
+}
+
+/**
+ * Diagnostiziert einen Breakdance-Post und gibt detaillierte Informationen zurück
+ * 
+ * @param int $post_id Post-ID
+ * @return array Diagnose-Ergebnis
+ */
+function csv_import_diagnose_breakdance_post( int $post_id ): array {
+    $post = get_post( $post_id );
+    if ( ! $post ) {
+        return [
+            'error' => 'Post nicht gefunden',
+            'post_id' => $post_id
+        ];
+    }
+    
+    // Breakdance-spezifische Metadaten sammeln
+    $breakdance_meta = [
+        '_breakdance_data' => get_post_meta( $post_id, '_breakdance_data', true ),
+        '_breakdance_is_editable' => get_post_meta( $post_id, '_breakdance_is_editable', true ),
+        'breakdance_data' => get_post_meta( $post_id, 'breakdance_data', true ),
+        '_breakdance_tree_id' => get_post_meta( $post_id, '_breakdance_tree_id', true ),
+        '_breakdance_revision_id' => get_post_meta( $post_id, '_breakdance_revision_id', true ),
+        '_breakdance_settings' => get_post_meta( $post_id, '_breakdance_settings', true ),
+    ];
+    
+    // Content-Analyse
+    $content_analysis = [
+        'has_content' => ! empty( $post->post_content ),
+        'content_length' => strlen( $post->post_content ),
+        'is_json' => false,
+        'json_valid' => false,
+        'json_error' => null
+    ];
+    
+    if ( ! empty( $post->post_content ) ) {
+        json_decode( $post->post_content, true );
+        $content_analysis['json_error'] = json_last_error_msg();
+        $content_analysis['json_valid'] = json_last_error() === JSON_ERROR_NONE;
+        $content_analysis['is_json'] = $content_analysis['json_valid'];
+    }
+    
+    // CSV-Import-Informationen
+    $import_info = [
+        'imported' => (bool) get_post_meta( $post_id, '_csv_import_session', true ),
+        'import_session' => get_post_meta( $post_id, '_csv_import_session', true ),
+        'import_date' => get_post_meta( $post_id, '_csv_import_date', true )
+    ];
+    
+    // Diagnose zusammenstellen
+    $issues = [];
+    $recommendations = [];
+    
+    if ( empty( $breakdance_meta['_breakdance_data'] ) && empty( $breakdance_meta['_breakdance_is_editable'] ) ) {
+        $issues[] = 'Fehlende Breakdance-Aktivierungs-Metadaten';
+        $recommendations[] = 'Verwenden Sie csv_import_repair_breakdance_posts(' . $post_id . ') um die Metadaten zu setzen';
+    }
+    
+    if ( ! $content_analysis['has_content'] ) {
+        $issues[] = 'Post-Content ist leer';
+        $recommendations[] = 'Content vom Template muss kopiert werden';
+    } elseif ( ! $content_analysis['is_json'] ) {
+        $issues[] = 'Post-Content ist kein gültiges JSON (Breakdance erwartet JSON)';
+        $recommendations[] = 'Content muss vom Breakdance-Template neu kopiert werden';
+    }
+    
+    return [
+        'post_id' => $post_id,
+        'post_title' => $post->post_title,
+        'post_status' => $post->post_status,
+        'post_type' => $post->post_type,
+        'breakdance_meta' => $breakdance_meta,
+        'content_analysis' => $content_analysis,
+        'import_info' => $import_info,
+        'issues' => $issues,
+        'recommendations' => $recommendations,
+        'needs_repair' => ! empty( $issues ),
+        'diagnosis_time' => current_time( 'mysql' )
+    ];
+}
+
+/**
+ * AJAX-Handler für die Reparatur von Breakdance-Posts
+ * Registriere diese Funktion in includes/admin/admin-ajax.php
+ */
+function csv_import_ajax_repair_breakdance() {
+    check_ajax_referer( 'csv_import_ajax', 'nonce' );
+    
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => 'Keine Berechtigung' ] );
+    }
+    
+    $post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    
+    $result = csv_import_repair_breakdance_posts( $post_id );
+    
+    if ( $result['success'] ) {
+        wp_send_json_success( $result );
+    } else {
+        wp_send_json_error( $result );
+    }
+}
+
+// Hook registrieren (in admin-ajax.php einfügen)
+// add_action( 'wp_ajax_csv_repair_breakdance', 'csv_import_ajax_repair_breakdance' );
+
+/**
+ * Admin-Notice für Breakdance-Reparatur-Tool
+ * Zeigt eine Schaltfläche im Admin-Bereich an
+ */
+function csv_import_breakdance_repair_notice() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
+    
+    // Nur auf CSV-Import-Seiten anzeigen
+    if ( ! isset( $_GET['page'] ) || strpos( $_GET['page'], 'csv-import' ) === false ) {
+        return;
+    }
+    
+    // Prüfen ob Breakdance aktiviert ist
+    $config = csv_import_get_config();
+    if ( $config['page_builder'] !== 'breakdance' ) {
+        return;
+    }
+    
+    // Zähle Posts die möglicherweise repariert werden müssen
+    global $wpdb;
+    $posts_needing_repair = $wpdb->get_var(
+        "SELECT COUNT(DISTINCT p.ID) 
+         FROM {$wpdb->posts} p
+         INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+         LEFT JOIN {$wpdb->postmeta} pm2 ON p.ID = pm2.post_id AND pm2.meta_key = '_breakdance_data'
+         WHERE pm.meta_key = '_csv_import_session'
+         AND pm2.meta_value IS NULL"
+    );
+    
+    if ( $posts_needing_repair > 0 ) {
+        ?>
+        <div class="notice notice-warning">
+            <p>
+                <strong>🔧 Breakdance-Reparatur verfügbar:</strong> 
+                Es wurden <?php echo $posts_needing_repair; ?> importierte Posts gefunden, 
+                die möglicherweise nicht korrekt als Breakdance-Seiten konfiguriert sind.
+            </p>
+            <p>
+                <button type="button" class="button button-primary" onclick="csvRepairBreakdance()">
+                    Jetzt alle reparieren
+                </button>
+                <span id="csv-repair-result" style="margin-left: 15px;"></span>
+            </p>
+        </div>
+        
+        <script>
+        function csvRepairBreakdance() {
+            const button = event.target;
+            const resultSpan = document.getElementById('csv-repair-result');
+            
+            button.disabled = true;
+            button.textContent = '⏳ Repariere...';
+            resultSpan.innerHTML = '';
+            
+            jQuery.post(ajaxurl, {
+                action: 'csv_repair_breakdance',
+                nonce: '<?php echo wp_create_nonce( 'csv_import_ajax' ); ?>',
+                post_id: 0 // 0 = alle Posts
+            }, function(response) {
+                if (response.success) {
+                    resultSpan.innerHTML = '<span style="color: green;">✅ ' + response.data.message + '</span>';
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    resultSpan.innerHTML = '<span style="color: red;">❌ ' + (response.data.message || 'Fehler bei der Reparatur') + '</span>';
+                    button.disabled = false;
+                    button.textContent = 'Erneut versuchen';
+                }
+            }).fail(function() {
+                resultSpan.innerHTML = '<span style="color: red;">❌ Serverfehler</span>';
+                button.disabled = false;
+                button.textContent = 'Erneut versuchen';
+            });
+        }
+        </script>
+        <?php
+    }
+}
+add_action( 'admin_notices', 'csv_import_breakdance_repair_notice' );
 
 csv_import_log( 'debug', 'CSV Import Pro Core Functions geladen - Version 5.2 (Dashboard Widget bereinigt)' );
