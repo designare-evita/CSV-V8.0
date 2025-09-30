@@ -413,7 +413,9 @@ function csv_import_pro_scheduler_status_handler(): void {
  * Handler zur Validierung von SEO-Daten in der Vorschau.
  */
 function csv_import_pro_seo_validate_handler(): void {
-    check_ajax_referer('csv_seo_preview', 'nonce'); // Beachten Sie die andere Nonce hier
+    // KORREKTUR: Einheitliche Nonce verwenden
+    check_ajax_referer('csv_import_ajax', 'nonce');
+    
     if (!current_user_can('edit_pages')) {
         csv_import_pro_ajax_error('Keine Berechtigung.', [], 403);
     }
