@@ -166,11 +166,18 @@ $current_seo_pl = get_option( 'csv_import_seo_plugin', 'none' );
 							<th scope="row"><label for="csv_import_local_path">Lokaler CSV-Pfad</label></th>
 							<td>
 								<input type="text" id="csv_import_local_path" name="csv_import_local_path"
-									   value="<?php echo esc_attr( get_option( 'csv_import_local_path', 'data/landingpages.csv' ) ); ?>"
-									   class="regular-text">
+									   value="<?php echo esc_attr( get_option( 'csv_import_local_path', '' ) ); ?>"
+									   class="regular-text" placeholder="z.B. data/meine-datei.csv">
 								<p class="description">
-									Pfad: <code><?php echo esc_html( ABSPATH . get_option( 'csv_import_local_path', 'data/landingpages.csv' ) ); ?></code>
-									<?php echo csv_import_get_file_status( ABSPATH . get_option( 'csv_import_local_path', 'data/landingpages.csv' ) ); ?>
+									Pfad: <code><?php echo esc_html( ABSPATH . get_option( 'csv_import_local_path', '[kein Pfad gesetzt]' ) ); ?></code>
+									<?php 
+									$local_path = get_option( 'csv_import_local_path', '' );
+									if ( ! empty( $local_path ) ) {
+										echo csv_import_get_file_status( ABSPATH . $local_path );
+									} else {
+										echo '<span style="color:#999;">ℹ️ Noch kein Pfad konfiguriert</span>';
+									}
+									?>
 								</p>
 							</td>
 						</tr>
