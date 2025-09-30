@@ -1096,20 +1096,6 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 }
 
 // ===================================================================
-// FINAL INITIALIZATION LOG
-// ===================================================================
-
-if (function_exists('csv_import_log')) {
-    csv_import_log('debug', 'CSV Import Pro AJAX-System komplett geladen - Version 10.0 (Template-Generierung korrigiert)', [
-        'total_handlers' => 8,
-        'security_features' => ['rate_limiting', 'ip_blacklist', 'capability_checks', 'nonce_verification'],
-        'monitoring_enabled' => true
-    ]);
-} else {
-    error_log('CSV Import Pro: AJAX-System komplett geladen - Version 10.0 (korrigiert)');
-}
-
-// ===================================================================
 // BREAKDANCE REPAIR AJAX-HANDLER
 // ===================================================================
 
@@ -1155,3 +1141,19 @@ function csv_import_ajax_repair_breakdance(): void {
         );
     }
 }
+
+
+// ===================================================================
+// FINAL INITIALIZATION LOG
+// ===================================================================
+
+if (function_exists('csv_import_log')) {
+    csv_import_log('debug', 'CSV Import Pro AJAX-System komplett geladen - Version 10.0 (Template-Generierung korrigiert)', [
+        'total_handlers' => 8,
+        'security_features' => ['rate_limiting', 'ip_blacklist', 'capability_checks', 'nonce_verification'],
+        'monitoring_enabled' => true
+    ]);
+} else {
+    error_log('CSV Import Pro: AJAX-System komplett geladen - Version 10.0 (korrigiert)');
+}
+
