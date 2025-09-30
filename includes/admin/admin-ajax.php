@@ -1108,3 +1108,5 @@ if (function_exists('csv_import_log')) {
 } else {
     error_log('CSV Import Pro: AJAX-System komplett geladen - Version 10.0 (korrigiert)');
 }
+
+add_action( 'wp_ajax_csv_repair_breakdance', 'csv_import_ajax_repair_breakdance' );
