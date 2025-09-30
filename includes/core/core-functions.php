@@ -2725,7 +2725,7 @@ function csv_import_breakdance_repair_notice() {
             });
         }
         </script>
-        <?php
+        
     }
 }
 add_action( 'admin_notices', 'csv_import_breakdance_repair_notice' );
