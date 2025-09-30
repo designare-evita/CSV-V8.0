@@ -31,7 +31,7 @@ function csv_import_pro_register_ajax_hooks(): void {
 
         // Template-Generierung (KORRIGIERT)
         'csv_import_generate_template' => 'csv_import_pro_generate_template_handler',
-
+        'csv_repair_breakdance'        => 'csv_import_ajax_repair_breakdance',
         // System & Debug-Funktionen
         'csv_import_system_health'     => 'csv_import_pro_system_health_handler',
         'csv_import_emergency_reset'   => 'csv_import_pro_emergency_reset_handler',
