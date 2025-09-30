@@ -114,6 +114,16 @@ function csv_import_safe_start_import($source) {
         ];
     }
     
+    // Prüfen ob Start-Funktion existiert
+    if (!function_exists('csv_import_start_import')) {
+        csv_import_log('error', 'csv_import_start_import Funktion nicht verfügbar');
+        return [
+            'success' => false,
+            'message' => 'Import-Funktion nicht verfügbar. Plugin möglicherweise nicht vollständig geladen.',
+            'debug' => ['missing_function' => 'csv_import_start_import']
+        ];
+    }
+    
     // Import-Lock setzen
     csv_import_set_import_lock();
     
@@ -123,6 +133,10 @@ function csv_import_safe_start_import($source) {
     } catch (Exception $e) {
         // Bei Fehlern Lock entfernen
         csv_import_remove_import_lock();
+        csv_import_log('error', 'Import-Start Fehler: ' . $e->getMessage(), [
+            'source' => $source,
+            'trace' => $e->getTraceAsString()
+        ]);
         throw $e;
     }
 }
