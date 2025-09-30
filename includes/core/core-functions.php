@@ -2394,7 +2394,6 @@ function csv_import_check_scheduler_dependencies(): array {
     return $summary;
 }
 
-<?php
 /**
  * Breakdance Reparatur-Tool
  * 
