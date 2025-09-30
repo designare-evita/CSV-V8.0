@@ -215,9 +215,7 @@ function csv_import_pro_cancel_handler(): void {
 // TEMPLATE-GENERIERUNG AJAX-HANDLER (KORRIGIERT)
 // ===================================================================
 
-/**
- * KORRIGIERTER Handler für Template-Generierung aus CSV-Headern
- */
+
 function csv_import_pro_generate_template_handler(): void {
     check_ajax_referer('csv_import_ajax', 'nonce');
     if (!current_user_can('edit_pages')) {
@@ -236,7 +234,6 @@ function csv_import_pro_generate_template_handler(): void {
         csv_import_pro_ajax_error('Template-Name ist erforderlich.');
     }
 
-    // Template-Name-Länge prüfen
     if (strlen($new_template_name) > 200) {
         csv_import_pro_ajax_error('Template-Name ist zu lang (max. 200 Zeichen).');
     }
@@ -258,14 +255,30 @@ function csv_import_pro_generate_template_handler(): void {
             throw new Exception('Keine Berechtigung zum Zugriff auf das Basis-Template.');
         }
 
+        // Prüfen ob create_template_from_csv_headers Methode existiert
+        if (!method_exists('CSV_Import_Template_Manager', 'create_template_from_csv_headers')) {
+            throw new Exception('Template-Generierungs-Methode nicht verfügbar in CSV_Import_Template_Manager Klasse.');
+        }
+
         // Template generieren
         $new_template_id = CSV_Import_Template_Manager::create_template_from_csv_headers(
             $base_template_id, 
             $new_template_name
         );
 
+        // KORREKTUR: Erweiterte Fehlerprüfung
         if (is_wp_error($new_template_id)) {
             throw new Exception($new_template_id->get_error_message());
+        }
+
+        if (!$new_template_id || !is_numeric($new_template_id) || $new_template_id <= 0) {
+            throw new Exception('Template-Erstellung fehlgeschlagen - ungültige oder leere ID zurückgegeben: ' . var_export($new_template_id, true));
+        }
+
+        // Nochmal prüfen ob Post wirklich erstellt wurde
+        $created_post = get_post($new_template_id);
+        if (!$created_post) {
+            throw new Exception('Template wurde angeblich erstellt (ID: ' . $new_template_id . '), aber Post kann nicht gefunden werden.');
         }
 
         // Erfolgreiche Antwort mit Template-Informationen
@@ -277,6 +290,8 @@ function csv_import_pro_generate_template_handler(): void {
             'template_name' => $new_template_name,
             'edit_link' => $edit_link,
             'view_link' => $view_link,
+            'post_title' => $created_post->post_title,
+            'post_status' => $created_post->post_status,
             'message_html' => sprintf(
                 'Template <strong>"%s"</strong> wurde erfolgreich erstellt! <a href="%s" target="_blank" class="button button-small">Jetzt bearbeiten</a>',
                 esc_html($new_template_name),
@@ -291,7 +306,9 @@ function csv_import_pro_generate_template_handler(): void {
             'new_template_name' => $new_template_name,
             'user_id' => get_current_user_id(),
             'user_can_edit_posts' => current_user_can('edit_posts'),
-            'class_exists_template_manager' => class_exists('CSV_Import_Template_Manager')
+            'class_exists_template_manager' => class_exists('CSV_Import_Template_Manager'),
+            'method_exists' => class_exists('CSV_Import_Template_Manager') ? method_exists('CSV_Import_Template_Manager', 'create_template_from_csv_headers') : false,
+            'base_post_exists' => isset($base_post) ? true : false
         ];
 
         if (function_exists('csv_import_log')) {
