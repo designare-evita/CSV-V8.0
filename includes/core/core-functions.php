@@ -2693,40 +2693,40 @@ function csv_import_breakdance_repair_notice() {
             </p>
         </div>
         
-        <script>
-        function csvRepairBreakdance() {
-            const button = event.target;
-            const resultSpan = document.getElementById('csv-repair-result');
-            
-            button.disabled = true;
-            button.textContent = '⏳ Repariere...';
-            resultSpan.innerHTML = '';
-            
-            jQuery.post(ajaxurl, {
-                action: 'csv_repair_breakdance',
-                nonce: '<?php echo wp_create_nonce( 'csv_import_ajax' ); ?>',
-                post_id: 0 // 0 = alle Posts
-            }, function(response) {
-                if (response.success) {
-                    resultSpan.innerHTML = '<span style="color: green;">✅ ' + response.data.message + '</span>';
-                    setTimeout(function() {
-                        location.reload();
-                    }, 2000);
-                } else {
-                    resultSpan.innerHTML = '<span style="color: red;">❌ ' + (response.data.message || 'Fehler bei der Reparatur') + '</span>';
-                    button.disabled = false;
-                    button.textContent = 'Erneut versuchen';
-                }
-            }).fail(function() {
-                resultSpan.innerHTML = '<span style="color: red;">❌ Serverfehler</span>';
-                button.disabled = false;
-                button.textContent = 'Erneut versuchen';
-            });
+     <script>
+function csvRepairBreakdance() {
+    const button = event.target;
+    const resultSpan = document.getElementById('csv-repair-result');
+    
+    button.disabled = true;
+    button.textContent = '⏳ Repariere...';
+    resultSpan.innerHTML = '';
+    
+    jQuery.post(ajaxurl, {
+        action: 'csv_repair_breakdance',
+        nonce: '<?php echo wp_create_nonce( 'csv_import_ajax' ); ?>',
+        post_id: 0 // 0 = alle Posts
+    }, function(response) {
+        if (response.success) {
+            resultSpan.innerHTML = '<span style="color: green;">✅ ' + response.data.message + '</span>';
+            setTimeout(function() {
+                location.reload();
+            }, 2000);
+        } else {
+            resultSpan.innerHTML = '<span style="color: red;">❌ ' + (response.data.message || 'Fehler bei der Reparatur') + '</span>';
+            button.disabled = false;
+            button.textContent = 'Erneut versuchen';
         }
-        </script>
-        
-    }
+    }).fail(function() {
+        resultSpan.innerHTML = '<span style="color: red;">❌ Serverfehler</span>';
+        button.disabled = false;
+        button.textContent = 'Erneut versuchen';
+    });
 }
+</script>
+        <?php  // <-- KRITISCH: Zurück zu PHP-Modus
+    }  // <-- Schließt if ( $posts_needing_repair > 0 )
+}  // <-- Schließt function csv_import_breakdance_repair_notice()
 add_action( 'admin_notices', 'csv_import_breakdance_repair_notice' );
 
 csv_import_log( 'debug', 'CSV Import Pro Core Functions geladen - Version 5.2 (Dashboard Widget bereinigt)' );
