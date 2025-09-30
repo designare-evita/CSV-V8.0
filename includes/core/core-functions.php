@@ -2681,19 +2681,57 @@ function csv_import_breakdance_repair_notice() {
         ?>
         <div class="notice notice-warning">
             <p>
-                <strong>🔧 Breakdance-Reparatur verfügbar:</strong> 
-                Es wurden <?php echo $posts_needing_repair; ?> importierte Posts gefunden, 
+                <strong>Breakdance-Reparatur verfügbar:</strong> 
+                Es wurden <?php echo esc_html( $posts_needing_repair ); ?> importierte Posts gefunden, 
                 die möglicherweise nicht korrekt als Breakdance-Seiten konfiguriert sind.
             </p>
             <p>
-                <button type="button" class="button button-primary" onclick="csvRepairBreakdance()">
+                <button type="button" class="button button-primary" id="csv-repair-breakdance-btn">
                     Jetzt alle reparieren
                 </button>
                 <span id="csv-repair-result" style="margin-left: 15px;"></span>
             </p>
         </div>
         
-     <script>
+        <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            $('#csv-repair-breakdance-btn').on('click', function() {
+                var button = $(this);
+                var resultSpan = $('#csv-repair-result');
+                
+                button.prop('disabled', true);
+                button.text('Repariere...');
+                resultSpan.html('');
+                
+                $.post(ajaxurl, {
+                    action: 'csv_repair_breakdance',
+                    nonce: '<?php echo wp_create_nonce( 'csv_import_ajax' ); ?>',
+                    post_id: 0
+                }, function(response) {
+                    if (response.success) {
+                        resultSpan.html('<span style="color: green;">✅ ' + response.data.message + '</span>');
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        var errorMsg = response.data && response.data.message ? response.data.message : 'Fehler bei der Reparatur';
+                        resultSpan.html('<span style="color: red;">❌ ' + errorMsg + '</span>');
+                        button.prop('disabled', false);
+                        button.text('Erneut versuchen');
+                    }
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    console.error('AJAX Fehler:', textStatus, errorThrown);
+                    resultSpan.html('<span style="color: red;">❌ Serverfehler: ' + textStatus + '</span>');
+                    button.prop('disabled', false);
+                    button.text('Erneut versuchen');
+                });
+            });
+        });
+        </script>
+        <?php
+    }
+}
+add_action( 'admin_notices', 'csv_import_breakdance_repair_notice' );
 function csvRepairBreakdance() {
     const button = event.target;
     const resultSpan = document.getElementById('csv-repair-result');
