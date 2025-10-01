@@ -287,25 +287,42 @@ generatePreview: function() {
         clearSampleData: function() {
             this.elements.sampleDataContainer.empty();
         },
+// HILFSFUNKTION ZUM "ENTSCHÄRFEN" VON SONDERZEICHEN
+escapeAttr: function(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+},
 
-        showColumnMappingUI: function(columns) {
-            const targetFields = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'featured_image'];
-            let tableHtml = '<h4>Spalten zuordnen</h4><table class="wp-list-table widefat striped"><thead><tr><th>CSV-Spalte</th><th>WordPress-Feld</th></tr></thead><tbody>';
-            columns.forEach(column => {
-                let optionsHtml = '<option value="">-- Ignorieren --</option>';
-                targetFields.forEach(field => {
-                    const isSelected = column.toLowerCase().replace(/[ -]/g, '_') === field;
-                    optionsHtml += `<option value="${field}" ${isSelected ? 'selected' : ''}>${field}</option>`;
-                });
-                tableHtml += `<tr><td><strong>${column}</strong></td><td><select name="csv_mapping[${column}]">${optionsHtml}</select></td></tr>`;
-            });
-            tableHtml += '</tbody></table>';
-            this.elements.mappingContainer.find('#mapping-table-target').html(tableHtml);
-            $('#csv-column-mapping-container').show();
-            $('#csv-seo-preview-container').show();
-            $('#csv-column-mapping-container').css('grid-column', 'auto');
-        }
-    };
+showColumnMappingUI: function(columns) {
+    const self = this; // 'this' für die forEach-Schleife verfügbar machen
+    const targetFields = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'featured_image'];
+    let tableHtml = '<h4>Spalten zuordnen</h4><table class="wp-list-table widefat striped"><thead><tr><th>CSV-Spalte</th><th>WordPress-Feld</th></tr></thead><tbody>';
+
+    columns.forEach(column => {
+        // Die Spaltenüberschrift vor der Verwendung "entschärfen"
+        const escapedColumn = self.escapeAttr(column);
+        let optionsHtml = '<option value="">-- Ignorieren --</option>';
+
+        targetFields.forEach(field => {
+            const isSelected = column.toLowerCase().replace(/[ -]/g, '_') === field;
+            optionsHtml += `<option value="${field}" ${isSelected ? 'selected' : ''}>${field}</option>`;
+        });
+
+        // Die entschärfte Variable im 'name'-Attribut verwenden
+        tableHtml += `<tr><td><strong>${column}</strong></td><td><select name="csv_mapping[${escapedColumn}]">${optionsHtml}</select></td></tr>`;
+    });
+
+    tableHtml += '</tbody></table>';
+    this.elements.mappingContainer.find('#mapping-table-target').html(tableHtml);
+    $('#csv-column-mapping-container').show();
+    $('#csv-seo-preview-container').show();
+    $('#csv-column-mapping-container').css('grid-column', 'auto');
+},
 
     $(document).ready(function() {
         if (typeof CSVImportAdmin !== 'undefined') {
