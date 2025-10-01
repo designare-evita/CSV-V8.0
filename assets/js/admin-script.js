@@ -128,7 +128,6 @@
             }
         },
 
-        // NEU: Hilfsfunktion, um eine Datenzeile (Array) mit den Headern zu einem Objekt zu machen
         mapRowToHeaders: function(headers, row) {
             const obj = {};
             headers.forEach((header, index) => {
@@ -137,48 +136,42 @@
             return obj;
         },
 
-        // NEU: Funktion zum Generieren der Live-Vorschau
-        // In assets/js/admin-script.js
+        generatePreview: function() {
+            if (!this.status.firstRowData) {
+                alert('Bitte validieren Sie zuerst eine CSV-Datei.');
+                return;
+            }
 
-generatePreview: function() {
-    if (!this.status.firstRowData) {
-        alert('Bitte validieren Sie zuerst eine CSV-Datei.');
-        return;
-    }
+            const templateId = $('#csv_import_template_id').val();
+            if (!templateId || templateId == 0) {
+                alert('Bitte geben Sie eine gültige Template-ID an.');
+                return;
+            }
 
-    const templateId = $('#csv_import_template_id').val();
-    if (!templateId || templateId == 0) {
-        alert('Bitte geben Sie eine gültige Template-ID an.');
-        return;
-    }
+            this.elements.previewContent.html('<div class="test-result test-progress">🔄 Vorschau wird geladen...</div>');
 
-    this.elements.previewContent.html('<div class="test-result test-progress">🔄 Vorschau wird geladen...</div>');
+            if (window.CSVSEOPreview && this.status.firstRowData) {
+                const previewData = {
+                    seo_title: this.status.firstRowData.post_title || this.status.firstRowData.title || '',
+                    seo_description: this.status.firstRowData.post_excerpt || this.status.firstRowData.excerpt || this.status.firstRowData.description || ''
+                };
+                window.CSVSEOPreview.updatePreview(previewData);
+            }
 
-    // NEU: SEO-Vorschau mit den Daten aus der CSV-Zeile aktualisieren
-    if (window.CSVSEOPreview && this.status.firstRowData) {
-        const previewData = {
-            seo_title: this.status.firstRowData.post_title || this.status.firstRowData.title || '',
-            seo_description: this.status.firstRowData.post_excerpt || this.status.firstRowData.excerpt || this.status.firstRowData.description || ''
-        };
-        // Die updatePreview-Funktion aus seo-preview.js aufrufen
-        window.CSVSEOPreview.updatePreview(previewData);
-    }
-
-    this.performAjaxRequest({
-        action: 'csv_import_generate_preview',
-        template_id: templateId,
-        row_data: this.status.firstRowData
-    }).done(response => {
-        if (response.success) {
-            this.elements.previewContent.html(response.data.preview_html);
-        } else {
-            this.elements.previewContent.html(`<div class="test-result test-error">❌ ${response.data.message}</div>`);
-        }
-    }).fail(() => {
-        this.elements.previewContent.html('<div class="test-result test-error">❌ Ein Serverfehler ist aufgetreten.</div>');
-    });
-},
-
+            this.performAjaxRequest({
+                action: 'csv_import_generate_preview',
+                template_id: templateId,
+                row_data: this.status.firstRowData
+            }).done(response => {
+                if (response.success) {
+                    this.elements.previewContent.html(response.data.preview_html);
+                } else {
+                    this.elements.previewContent.html(`<div class="test-result test-error">❌ ${response.data.message}</div>`);
+                }
+            }).fail(() => {
+                this.elements.previewContent.html('<div class="test-result test-error">❌ Ein Serverfehler ist aufgetreten.</div>');
+            });
+        },
 
         getDataFromRow: function(row, columns, possibleKeys) {
             for (const key of possibleKeys) {
@@ -287,42 +280,41 @@ generatePreview: function() {
         clearSampleData: function() {
             this.elements.sampleDataContainer.empty();
         },
-// HILFSFUNKTION ZUM "ENTSCHÄRFEN" VON SONDERZEICHEN
-escapeAttr: function(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-},
 
-showColumnMappingUI: function(columns) {
-    const self = this; // 'this' für die forEach-Schleife verfügbar machen
-    const targetFields = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'featured_image'];
-    let tableHtml = '<h4>Spalten zuordnen</h4><table class="wp-list-table widefat striped"><thead><tr><th>CSV-Spalte</th><th>WordPress-Feld</th></tr></thead><tbody>';
+        escapeAttr: function(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        },
 
-    columns.forEach(column => {
-        // Die Spaltenüberschrift vor der Verwendung "entschärfen"
-        const escapedColumn = self.escapeAttr(column);
-        let optionsHtml = '<option value="">-- Ignorieren --</option>';
+        showColumnMappingUI: function(columns) {
+            const self = this;
+            const targetFields = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'featured_image'];
+            let tableHtml = '<h4>Spalten zuordnen</h4><table class="wp-list-table widefat striped"><thead><tr><th>CSV-Spalte</th><th>WordPress-Feld</th></tr></thead><tbody>';
 
-        targetFields.forEach(field => {
-            const isSelected = column.toLowerCase().replace(/[ -]/g, '_') === field;
-            optionsHtml += `<option value="${field}" ${isSelected ? 'selected' : ''}>${field}</option>`;
-        });
+            columns.forEach(column => {
+                const escapedColumn = self.escapeAttr(column);
+                let optionsHtml = '<option value="">-- Ignorieren --</option>';
 
-        // Die entschärfte Variable im 'name'-Attribut verwenden
-        tableHtml += `<tr><td><strong>${column}</strong></td><td><select name="csv_mapping[${escapedColumn}]">${optionsHtml}</select></td></tr>`;
-    });
+                targetFields.forEach(field => {
+                    const isSelected = column.toLowerCase().replace(/[ -]/g, '_') === field;
+                    optionsHtml += `<option value="${field}" ${isSelected ? 'selected' : ''}>${field}</option>`;
+                });
 
-    tableHtml += '</tbody></table>';
-    this.elements.mappingContainer.find('#mapping-table-target').html(tableHtml);
-    $('#csv-column-mapping-container').show();
-    $('#csv-seo-preview-container').show();
-    $('#csv-column-mapping-container').css('grid-column', 'auto');
-},
+                tableHtml += `<tr><td><strong>${column}</strong></td><td><select name="csv_mapping[${escapedColumn}]">${optionsHtml}</select></td></tr>`;
+            });
+
+            tableHtml += '</tbody></table>';
+            this.elements.mappingContainer.find('#mapping-table-target').html(tableHtml);
+            $('#csv-column-mapping-container').show();
+            $('#csv-seo-preview-container').show();
+            $('#csv-column-mapping-container').css('grid-column', 'auto');
+        }
+    }; // <-- HIER WAR DER FEHLER: Das Objekt muss hier geschlossen werden.
 
     $(document).ready(function() {
         if (typeof CSVImportAdmin !== 'undefined') {
