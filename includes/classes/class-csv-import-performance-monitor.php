@@ -1,68 +1,48 @@
 <?php
 
 if ( ! defined( 'ABSPATH' ) ) {
-	exit; // Direkten Zugriff verhindern
+    exit; // Direkten Zugriff verhindern
 }
 // ===================================================================
-// IMPORT PROFILES SYSTEM
+// PERFORMANCE MONITORING SYSTEM
 // ===================================================================
 
-class CSV_Import_Profile_Manager {
-    
-    public static function save_profile($name, $config) {
-        $profiles = get_option('csv_import_profiles', []);
-        
-        $profile_id = sanitize_key($name);
-        $profiles[$profile_id] = [
-            'name' => sanitize_text_field($name),
-            'config' => $config,
-            'created_at' => current_time('mysql'),
-            'created_by' => get_current_user_id(),
-            'last_used' => null,
-            'use_count' => 0
-        ];
-        
-        update_option('csv_import_profiles', $profiles);
-        
-        return $profile_id;
+class CSV_Import_Performance_Monitor {
+
+    private static $start_time;
+    private static $start_memory;
+
+    public static function start() {
+        self::$start_time = microtime(true);
+        self::$start_memory = memory_get_usage();
+
+        add_action('shutdown', [__CLASS__, 'log_performance']);
     }
-    
-    public static function get_profiles() {
-        return get_option('csv_import_profiles', []);
-    }
-    
-    public static function get_profile($profile_id) {
-        $profiles = self::get_profiles();
-        return $profiles[$profile_id] ?? null;
-    }
-    
-    public static function load_profile($profile_id) {
-        $profile = self::get_profile($profile_id);
-        if (!$profile) {
-            return false;
+
+    public static function log_performance() {
+        if (!self::$start_time) {
+            return;
         }
-        
-        // Konfiguration laden
-        foreach ($profile['config'] as $key => $value) {
-            update_option('csv_import_' . $key, $value);
+
+        $end_time = microtime(true);
+        $end_memory = memory_get_usage();
+
+        $execution_time = $end_time - self::$start_time;
+        $memory_used = $end_memory - self::$start_memory;
+
+        // Log performance if it exceeds certain thresholds
+        if ($execution_time > 5 || $memory_used > 10 * 1024 * 1024) { // 5 seconds or 10MB
+             if (function_exists('csv_import_log')) {
+                csv_import_log('info', 'Performance Metrics', [
+                    'execution_time_seconds' => round($execution_time, 2),
+                    'memory_used' => size_format($memory_used),
+                    'peak_memory' => size_format(memory_get_peak_usage()),
+                    'request_uri' => $_SERVER['REQUEST_URI'] ?? 'N/A'
+                ]);
+            }
         }
-        
-        // Nutzungsstatistik aktualisieren
-        $profiles = self::get_profiles();
-        $profiles[$profile_id]['last_used'] = current_time('mysql');
-        $profiles[$profile_id]['use_count']++;
-        update_option('csv_import_profiles', $profiles);
-        
-        return true;
-    }
-    
-    public static function delete_profile($profile_id) {
-        $profiles = self::get_profiles();
-        if (isset($profiles[$profile_id])) {
-            unset($profiles[$profile_id]);
-            update_option('csv_import_profiles', $profiles);
-            return true;
-        }
-        return false;
     }
 }
+
+// Initialize the monitor
+CSV_Import_Performance_Monitor::start();
