@@ -260,11 +260,8 @@ private function apply_mapping( array $row ): array {
      */
 /**
  * KORRIGIERTE apply_page_builder_template() Methode für Breakdance
- * 
- * Ersetze die bestehende Methode in includes/core/class-csv-import-run.php
- * ab Zeile ~164
+ * Version 2.0 - Vollständig überarbeitet
  */
-
 private function apply_page_builder_template( int $post_id, array $data ): void {
     if ( ! $this->template_post ) {
         return;
@@ -433,9 +430,9 @@ private function apply_page_builder_template( int $post_id, array $data ): void 
         ]);
     }
 }
-        
- 
-					
+
+
+        			
 
 	private function validate_header( array $header ): void {
 		if ( empty( $header ) ) {
