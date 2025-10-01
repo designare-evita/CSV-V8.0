@@ -736,8 +736,7 @@ function csv_import_detect_csv_delimiter( string $csv_content ): string {
  */
 function csv_import_start_import( string $source, array $config = null ): array {
     try {
-        if ( csv_import_
-            is_import_running() ) {
+        if ( csv_import_is_import_running() ) {
             $progress = get_option('csv_import_progress', []);
             return [
                 'success' => false,
