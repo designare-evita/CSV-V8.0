@@ -945,23 +945,55 @@ function csv_import_create_post_from_row( array $row, array $config, string $ses
 
 /**
  * Wendet ein Template auf Post-Content an
+ * NEUE VERSION: Erkennt Page-Builder-JSON (z.B. Breakdance) und wendet Platzhalter sicher an.
  */
 function csv_import_apply_template( int $template_id, array $row, array $config ): string {
     $template_post = get_post( $template_id );
     if ( ! $template_post ) {
         throw new Exception( "Template mit ID {$template_id} nicht gefunden" );
     }
-    
+
     $content = $template_post->post_content;
-    
+    $page_builder = $config['page_builder'] ?? 'gutenberg';
+
+    // Spezielle Logik für JSON-basierte Page Builder wie Breakdance
+    if ($page_builder === 'breakdance') {
+        $json_data = json_decode($content, true);
+
+        // Prüfen, ob der Inhalt valides JSON ist
+        if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
+
+            // Rekursive Funktion, um Platzhalter in verschachtelten Arrays/Objekten zu ersetzen
+            $json_replacer = function(&$item) use ($row, &$json_replacer) {
+                if (is_string($item)) {
+                    foreach ($row as $key => $value) {
+                        $placeholder = '{{' . trim($key) . '}}';
+                        $item = str_replace($placeholder, $value, $item);
+                    }
+                } elseif (is_array($item)) {
+                    foreach ($item as &$value) {
+                        $json_replacer($value);
+                    }
+                }
+            };
+
+            $json_replacer($json_data);
+
+            // Die Daten zurück in einen JSON-String konvertieren
+            return wp_json_encode($json_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+    }
+
+    // Fallback / Standard-Verhalten für Gutenberg, Enfold etc.
     foreach ( $row as $key => $value ) {
         $placeholder = '{{' . $key . '}}';
         $content = str_replace( $placeholder, $value, $content );
     }
-    
+
+    // Legacy-Platzhalter
     $content = str_replace( '{{title}}', $row['post_title'] ?? '', $content );
     $content = str_replace( '{{content}}', $row['post_content'] ?? '', $content );
-    
+
     return $content;
 }
 
