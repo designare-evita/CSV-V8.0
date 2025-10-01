@@ -1,8 +1,8 @@
 <?php
 /**
  * Die zentrale Klasse zur Durchführung des CSV-Imports.
- * Korrigierte Version - kompatibel mit core-functions.php
- * ERWEITERTE VERSION: Unterstützung für mehrere Page Builder (Breakdance, Enfold).
+ * Version 6.0 - MIT SEO-INTEGRATION
+ * Unterstützt: Breakdance, Elementor, Enfold, WPBakery, Gutenberg
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -16,7 +16,7 @@ class CSV_Import_Pro_Run {
 	private array $existing_slugs = [];
 	private string $source;
 	private array $csv_data = [];
-    private array $mapping = [];
+	private array $mapping = [];
 
 	private function __construct( string $source ) {
 		$this->source     = $source;
@@ -24,10 +24,10 @@ class CSV_Import_Pro_Run {
 	}
 
 	public static function run( string $source, array $mapping = [] ): array {
-        $importer = new self( $source );
-        $importer->mapping = $mapping;
-        return $importer->execute_import();
-    }
+		$importer = new self( $source );
+		$importer->mapping = $mapping;
+		return $importer->execute_import();
+	}
 
 	private function execute_import(): array {
 		if ( class_exists( 'CSV_Import_Error_Handler' ) && method_exists( 'CSV_Import_Error_Handler', 'reset_error_counts' ) ) {
@@ -95,18 +95,18 @@ class CSV_Import_Pro_Run {
 		}
 	}
 
-private function apply_mapping( array $row ): array {
-    if ( empty( $this->mapping ) ) {
-        return $row;
-    }
-    $mapped_data = [];
-    foreach ( $this->mapping as $original_column => $target_field ) {
-        if ( isset( $row[ $original_column ] ) && ! empty( $target_field ) ) {
-            $mapped_data[ $target_field ] = $row[ $original_column ];
-        }
-    }
-    return array_merge( $row, $mapped_data );
-}
+	private function apply_mapping( array $row ): array {
+		if ( empty( $this->mapping ) ) {
+			return $row;
+		}
+		$mapped_data = [];
+		foreach ( $this->mapping as $original_column => $target_field ) {
+			if ( isset( $row[ $original_column ] ) && ! empty( $target_field ) ) {
+				$mapped_data[ $target_field ] = $row[ $original_column ];
+			}
+		}
+		return array_merge( $row, $mapped_data );
+	}
 	
 	private function load_and_validate_config(): void {
 		$this->config = csv_import_get_config();
@@ -149,15 +149,15 @@ private function apply_mapping( array $row ): array {
 		}
 		
 		foreach ( $rows as $index => $row_data ) {
-            try {
-                if ( $processed % 5 === 0 ) {
-                    csv_import_update_progress( $processed, $total_rows, 'processing' );
-                }
+			try {
+				if ( $processed % 5 === 0 ) {
+					csv_import_update_progress( $processed, $total_rows, 'processing' );
+				}
 
-                $mapped_row = $this->apply_mapping( $row_data );
-                $post_result = $this->process_single_row( $mapped_row );
+				$mapped_row = $this->apply_mapping( $row_data );
+				$post_result = $this->process_single_row( $mapped_row );
 
-                if ( $post_result === 'created' ) {
+				if ( $post_result === 'created' ) {
 					$results['created']++;
 				} elseif ( $post_result === 'skipped' ) {
 					$results['skipped']++;
@@ -217,7 +217,7 @@ private function apply_mapping( array $row ): array {
 	private function create_post_transaction( array $data, string $post_slug ): ?int {
 		$post_data = [
 			'post_title'   => $this->sanitize_title( $data['post_title'] ?? $data['title'] ?? '' ),
-			'post_content' => '', // Wird vom Page Builder gesetzt
+			'post_content' => '',
 			'post_excerpt' => $data['post_excerpt'] ?? $data['excerpt'] ?? '',
 			'post_name'    => $post_slug,
 			'post_status'  => $this->config['post_status'] ?? 'draft',
@@ -228,17 +228,17 @@ private function apply_mapping( array $row ): array {
 			]
 		];
 		
-        // Post zuerst erstellen, um eine ID zu erhalten
-        $post_id = wp_insert_post( $post_data );
+		// Post erstellen
+		$post_id = wp_insert_post( $post_data );
 
-        if ( is_wp_error( $post_id ) ) {
-            throw new Exception( 'WordPress Fehler: ' . $post_id->get_error_message() );
-        }
+		if ( is_wp_error( $post_id ) ) {
+			throw new Exception( 'WordPress Fehler: ' . $post_id->get_error_message() );
+		}
 
-        // Template und Page-Builder-spezifische Daten anwenden
-        if ( $this->template_post && ! empty( $this->config['page_builder'] ) && $this->config['page_builder'] !== 'none' ) {
-            $this->apply_page_builder_template( $post_id, $data );
-        }
+		// Template anwenden
+		if ( $this->template_post && ! empty( $this->config['page_builder'] ) && $this->config['page_builder'] !== 'none' ) {
+			$this->apply_page_builder_template( $post_id, $data );
+		}
 		
 		// Meta-Felder hinzufügen
 		$this->add_meta_fields( $post_id, $data );
@@ -247,192 +247,137 @@ private function apply_mapping( array $row ): array {
 		if ( ! empty( $this->config['image_source'] ) && $this->config['image_source'] !== 'none' ) {
 			$this->process_post_images( $post_id, $data );
 		}
+		
+		// SEO-Daten verarbeiten (KRITISCH - HIER WAR DER FEHLER!)
+		if ( ! empty( $this->config['seo_plugin'] ) && $this->config['seo_plugin'] !== 'none' ) {
+			csv_import_add_seo_data( $post_id, $data, $this->config );
+		}
+		
 		do_action( 'csv_import_post_created', $post_id, $this->session_id, $this->source );
 		return $post_id;
 	}
 
-    /**
-     * Wendet das Template basierend auf dem ausgewählten Page Builder an.
-     * Diese Methode verarbeitet sowohl den post_content als auch die notwendigen Meta-Felder.
-     *
-     * @param int $post_id Die ID des neu erstellten Posts.
-     * @param array $data Die Datenzeile aus der CSV.
-     */
-/**
- * KORRIGIERTE apply_page_builder_template() Methode für Breakdance
- * Version 2.0 - Vollständig überarbeitet
- */
-private function apply_page_builder_template( int $post_id, array $data ): void {
-    if ( ! $this->template_post ) {
-        return;
-    }
+	private function apply_page_builder_template( int $post_id, array $data ): void {
+		if ( ! $this->template_post ) {
+			return;
+		}
 
-    $page_builder = $this->config['page_builder'];
-    $template_content = $this->template_post->post_content;
-    $template_meta = get_post_meta( $this->template_post->ID );
+		$page_builder = $this->config['page_builder'];
+		$template_content = $this->template_post->post_content;
+		$template_meta = get_post_meta( $this->template_post->ID );
 
-    // Globale Ersetzungsfunktion für Strings
-    $replacer = function( $value ) use ( $data ) {
-        if ( ! is_string( $value ) ) return $value;
-        foreach ( $data as $key => $csv_value ) {
-            $value = str_replace( '{{' . $key . '}}', $csv_value, $value );
-        }
-        return $value;
-    };
-    
-    // Globale Ersetzungsfunktion für JSON-Strukturen (rekursiv)
-    $json_replacer = function( &$item ) use ( $data, &$json_replacer ) {
-        if ( is_string( $item ) ) {
-            foreach ( $data as $key => $csv_value ) {
-                $item = str_replace( '{{' . $key . '}}', $csv_value, $item );
-            }
-        } elseif ( is_array( $item ) ) {
-            foreach ( $item as &$value ) {
-                $json_replacer( $value );
-            }
-        }
-    };
+		$replacer = function( $value ) use ( $data ) {
+			if ( ! is_string( $value ) ) return $value;
+			foreach ( $data as $key => $csv_value ) {
+				$value = str_replace( '{{' . $key . '}}', $csv_value, $value );
+			}
+			return $value;
+		};
+		
+		$json_replacer = function( &$item ) use ( $data, &$json_replacer ) {
+			if ( is_string( $item ) ) {
+				foreach ( $data as $key => $csv_value ) {
+					$item = str_replace( '{{' . $key . '}}', $csv_value, $item );
+				}
+			} elseif ( is_array( $item ) ) {
+				foreach ( $item as &$value ) {
+					$json_replacer( $value );
+				}
+			}
+		};
 
-    // Standard-Meta-Felder vom Template auf den neuen Post übertragen
-    foreach ( $template_meta as $meta_key => $meta_values ) {
-        if ( isset( $meta_values[0] ) ) {
-            $unserialized_value = maybe_unserialize( $meta_values[0] );
-            // Platzhalter ersetzen, falls es ein String ist
-            if ( is_string( $unserialized_value ) ) {
-                update_post_meta( $post_id, $meta_key, $replacer( $unserialized_value ) );
-            } else {
-                update_post_meta( $post_id, $meta_key, $unserialized_value );
-            }
-        }
-    }
+		foreach ( $template_meta as $meta_key => $meta_values ) {
+			if ( isset( $meta_values[0] ) ) {
+				$unserialized_value = maybe_unserialize( $meta_values[0] );
+				if ( is_string( $unserialized_value ) ) {
+					update_post_meta( $post_id, $meta_key, $replacer( $unserialized_value ) );
+				} else {
+					update_post_meta( $post_id, $meta_key, $unserialized_value );
+				}
+			}
+		}
 
-    $final_content = $replacer( $template_content );
+		$final_content = $replacer( $template_content );
 
-    // Page-Builder-spezifische Logik
-    switch ( $page_builder ) {
-        case 'elementor':
-            if ( isset( $template_meta['_elementor_data'][0] ) ) {
-                $elementor_data_string = $replacer( $template_meta['_elementor_data'][0] );
-                update_post_meta( $post_id, '_elementor_data', wp_slash( $elementor_data_string ) );
-            }
-            update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
-            break;
+		switch ( $page_builder ) {
+			case 'elementor':
+				if ( isset( $template_meta['_elementor_data'][0] ) ) {
+					$elementor_data_string = $replacer( $template_meta['_elementor_data'][0] );
+					update_post_meta( $post_id, '_elementor_data', wp_slash( $elementor_data_string ) );
+				}
+				update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
+				break;
 
-        case 'breakdance':
-            // ===================================================================
-            // 🔥 KORRIGIERT: Breakdance-spezifische Verarbeitung
-            // ===================================================================
-            
-            // 1. Template-Content als JSON dekodieren
-            $json_data = json_decode( $template_content, true );
-            
-            if ( json_last_error() === JSON_ERROR_NONE && is_array( $json_data ) ) {
-                // JSON erfolgreich dekodiert - Platzhalter ersetzen
-                $json_replacer( $json_data );
-                
-                // Zurück zu JSON konvertieren
-                $final_content = wp_json_encode( $json_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-                
-                // Logging für Debugging
-                csv_import_log( 'debug', 'Breakdance Template verarbeitet', [
-                    'post_id' => $post_id,
-                    'json_decoded' => true,
-                    'content_length' => strlen( $final_content ),
-                    'template_id' => $this->template_post->ID
-                ]);
-            } else {
-                // Falls kein JSON: Normale String-Ersetzung
-                csv_import_log( 'warning', 'Breakdance Template ist kein JSON - verwende String-Ersetzung', [
-                    'post_id' => $post_id,
-                    'json_error' => json_last_error_msg(),
-                    'template_id' => $this->template_post->ID
-                ]);
-            }
-            
-            // 2. KRITISCH: Breakdance-spezifische Metadaten setzen
-            // Diese sind ZWINGEND erforderlich, damit Breakdance die Seite erkennt
-            
-            // Hauptmeta-Feld für Breakdance-Aktivierung
-            update_post_meta( $post_id, '_breakdance_data', '1' );
-            
-            // Alternative Meta-Felder (verschiedene Breakdance-Versionen verwenden unterschiedliche)
-            update_post_meta( $post_id, '_breakdance_is_editable', '1' );
-            update_post_meta( $post_id, 'breakdance_data', '1' );
-            
-            // 3. Zusätzliche Breakdance-Metadaten vom Template kopieren
-            $breakdance_meta_keys = [
-                '_breakdance_tree_id',
-                '_breakdance_revision_id', 
-                '_breakdance_settings',
-                '_breakdance_custom_css',
-                '_breakdance_custom_js',
-                'breakdance_settings',
-                'breakdance_custom_css'
-            ];
-            
-            foreach ( $breakdance_meta_keys as $bd_meta_key ) {
-                if ( isset( $template_meta[$bd_meta_key][0] ) ) {
-                    $bd_value = maybe_unserialize( $template_meta[$bd_meta_key][0] );
-                    
-                    // Bei String-Werten: Platzhalter ersetzen
-                    if ( is_string( $bd_value ) ) {
-                        $bd_value = $replacer( $bd_value );
-                    }
-                    
-                    update_post_meta( $post_id, $bd_meta_key, $bd_value );
-                    
-                    csv_import_log( 'debug', "Breakdance Meta übertragen: {$bd_meta_key}", [
-                        'post_id' => $post_id,
-                        'value_type' => gettype( $bd_value )
-                    ]);
-                }
-            }
-            
-            // 4. Breakdance-Kategorisierung für die Übersicht
-            // Damit Breakdance-Seiten in der WP-Übersicht erkennbar sind
-            wp_set_object_terms( $post_id, ['breakdance'], 'page_builder_type', false );
-            
-            break;
+			case 'breakdance':
+				$json_data = json_decode( $template_content, true );
+				
+				if ( json_last_error() === JSON_ERROR_NONE && is_array( $json_data ) ) {
+					$json_replacer( $json_data );
+					$final_content = wp_json_encode( $json_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+					
+					csv_import_log( 'debug', 'Breakdance Template verarbeitet', [
+						'post_id' => $post_id,
+						'json_decoded' => true,
+						'content_length' => strlen( $final_content )
+					]);
+				}
+				
+				update_post_meta( $post_id, '_breakdance_data', '1' );
+				update_post_meta( $post_id, '_breakdance_is_editable', '1' );
+				update_post_meta( $post_id, 'breakdance_data', '1' );
+				
+				$breakdance_meta_keys = [
+					'_breakdance_tree_id',
+					'_breakdance_revision_id', 
+					'_breakdance_settings',
+					'_breakdance_custom_css',
+					'_breakdance_custom_js'
+				];
+				
+				foreach ( $breakdance_meta_keys as $bd_meta_key ) {
+					if ( isset( $template_meta[$bd_meta_key][0] ) ) {
+						$bd_value = maybe_unserialize( $template_meta[$bd_meta_key][0] );
+						if ( is_string( $bd_value ) ) {
+							$bd_value = $replacer( $bd_value );
+						}
+						update_post_meta( $post_id, $bd_meta_key, $bd_value );
+					}
+				}
+				
+				wp_set_object_terms( $post_id, ['breakdance'], 'page_builder_type', false );
+				break;
 
-        case 'enfold':
-            // Enfold speichert Shortcodes im post_content
-            update_post_meta( $post_id, '_av_alb_advanced_layout_status', 'active' );
-            if ( isset( $template_meta['_aviaLayoutBuilder_active'][0] ) ) {
-                 update_post_meta( $post_id, '_aviaLayoutBuilder_active', 'active' );
-            }
-            break;
+			case 'enfold':
+				update_post_meta( $post_id, '_av_alb_advanced_layout_status', 'active' );
+				if ( isset( $template_meta['_aviaLayoutBuilder_active'][0] ) ) {
+					update_post_meta( $post_id, '_aviaLayoutBuilder_active', 'active' );
+				}
+				break;
 
-        case 'wpbakery':
-        case 'gutenberg':
-        default:
-            // Für diese Builder ist das Ersetzen der Platzhalter im `post_content` ausreichend
-            break;
-    }
-    
-    // Den finalen post_content für alle Builder aktualisieren
-    $update_result = wp_update_post( [
-        'ID' => $post_id,
-        'post_content' => $final_content
-    ], true );
-    
-    // Fehlerbehandlung für wp_update_post
-    if ( is_wp_error( $update_result ) ) {
-        csv_import_log( 'error', 'Fehler beim Aktualisieren des Post-Contents', [
-            'post_id' => $post_id,
-            'error' => $update_result->get_error_message(),
-            'page_builder' => $page_builder
-        ]);
-    } else {
-        csv_import_log( 'debug', 'Post-Content erfolgreich aktualisiert', [
-            'post_id' => $post_id,
-            'page_builder' => $page_builder,
-            'content_length' => strlen( $final_content )
-        ]);
-    }
-}
-
-
-        			
+			case 'wpbakery':
+			case 'gutenberg':
+			default:
+				break;
+		}
+		
+		$update_result = wp_update_post( [
+			'ID' => $post_id,
+			'post_content' => $final_content
+		], true );
+		
+		if ( is_wp_error( $update_result ) ) {
+			csv_import_log( 'error', 'Fehler beim Aktualisieren des Post-Contents', [
+				'post_id' => $post_id,
+				'error' => $update_result->get_error_message()
+			]);
+		} else {
+			csv_import_log( 'debug', 'Post-Content erfolgreich aktualisiert', [
+				'post_id' => $post_id,
+				'page_builder' => $page_builder,
+				'content_length' => strlen( $final_content )
+			]);
+		}
+	}
 
 	private function validate_header( array $header ): void {
 		if ( empty( $header ) ) {
@@ -503,7 +448,17 @@ private function apply_page_builder_template( int $post_id, array $data ): void 
 	}
 	
 	private function add_meta_fields( int $post_id, array $data ): void {
-		$skip_fields = ['post_title', 'title', 'post_content', 'content', 'post_excerpt', 'excerpt', 'post_name'];
+		$skip_fields = [
+			'post_title', 
+			'title', 
+			'post_content', 
+			'content', 
+			'post_excerpt', 
+			'excerpt', 
+			'post_name',
+			'meta_title',
+			'meta_description'
+		];
 		
 		foreach ( $data as $key => $value ) {
 			if ( ! in_array( $key, $skip_fields ) && ! empty( $value ) ) {
