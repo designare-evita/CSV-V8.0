@@ -8,17 +8,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ===================================================================
 
 class CSV_Import_Performance_Monitor {
-
+    
     private static $start_time;
     private static $start_memory;
 
     public static function start() {
         self::$start_time = microtime(true);
         self::$start_memory = memory_get_usage();
-
+        
         add_action('shutdown', [__CLASS__, 'log_performance']);
     }
-
+    
     public static function log_performance() {
         if (!self::$start_time) {
             return;
@@ -26,7 +26,7 @@ class CSV_Import_Performance_Monitor {
 
         $end_time = microtime(true);
         $end_memory = memory_get_usage();
-
+        
         $execution_time = $end_time - self::$start_time;
         $memory_used = $end_memory - self::$start_memory;
 
