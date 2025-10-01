@@ -247,7 +247,7 @@ private function apply_mapping( array $row ): array {
 		if ( ! empty( $this->config['image_source'] ) && $this->config['image_source'] !== 'none' ) {
 			$this->process_post_images( $post_id, $data );
 		}
-		
+		do_action( 'csv_import_post_created', $post_id, $this->session_id, $this->source );
 		return $post_id;
 	}
 
