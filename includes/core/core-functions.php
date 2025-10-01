@@ -947,6 +947,7 @@ function csv_import_create_post_from_row( array $row, array $config, string $ses
  * Wendet ein Template auf Post-Content an
  * NEUE VERSION: Erkennt Page-Builder-JSON (z.B. Breakdance) und wendet Platzhalter sicher an.
  */
+
 function csv_import_apply_template( int $template_id, array $row, array $config ): string {
     $template_post = get_post( $template_id );
     if ( ! $template_post ) {
