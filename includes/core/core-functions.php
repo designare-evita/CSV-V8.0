@@ -1108,36 +1108,181 @@ function csv_import_download_and_attach_image( string $image_url, int $post_id )
 /**
  * Fügt SEO-Daten hinzu
  */
+<?php
+/**
+ * KORRIGIERTE FUNKTION: Fügt SEO-Daten hinzu
+ * Diese Version unterstützt korrekt All in One SEO (AIOSEO)
+ * 
+ * Ersetzen Sie die bestehende csv_import_add_seo_data() Funktion in:
+ * includes/core/core-functions.php (ca. Zeile 1580)
+ */
 function csv_import_add_seo_data( int $post_id, array $row, array $config ): void {
     $seo_plugin = $config['seo_plugin'];
     $set_noindex = get_option('csv_import_noindex_posts', false);
 
-    if ( $seo_plugin === 'yoast' && class_exists( 'WPSEO_Options' ) ) {
-        if ( ! empty( $row['seo_title'] ) ) {
-            update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $row['seo_title'] ) );
+    // ===================================================================
+    // ALL IN ONE SEO (AIOSEO) - KORRIGIERT FÜR IHRE CSV-STRUKTUR
+    // ===================================================================
+    if ( $seo_plugin === 'aioseo' ) {
+        // Prüfen ob AIOSEO installiert und aktiv ist
+        if ( ! class_exists( 'AIOSEO\\Plugin\\AIOSEO' ) && ! function_exists( 'aioseo' ) ) {
+            csv_import_log( 'warning', "All in One SEO Plugin nicht gefunden - überspringe SEO-Daten für Post {$post_id}" );
+            return;
         }
-        if ( ! empty( $row['seo_description'] ) ) {
-            update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $row['seo_description'] ) );
+
+        // SEO Title aus meta_title Spalte setzen
+        if ( ! empty( $row['meta_title'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                '_aioseo_title', 
+                sanitize_text_field( $row['meta_title'] ) 
+            );
         }
+        
+        // SEO Description aus meta_description Spalte setzen
+        if ( ! empty( $row['meta_description'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                '_aioseo_description', 
+                sanitize_textarea_field( $row['meta_description'] ) 
+            );
+        }
+        
+        // Fallback: Wenn meta_title leer ist, nutze post_title
+        if ( empty( $row['meta_title'] ) && ! empty( $row['post_title'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                '_aioseo_title', 
+                sanitize_text_field( $row['post_title'] ) 
+            );
+        }
+        
+        // Noindex setzen wenn aktiviert
         if ( $set_noindex ) {
-            update_post_meta( $post_id, '_yoast_wpseo_meta-robots-noindex', '1' );
+            // AIOSEO verwendet eine JSON-Struktur für robots Meta
+            $robots_meta = [
+                'default' => false,
+                'noindex' => true,
+                'nofollow' => false,
+                'noarchive' => false,
+                'noimageindex' => false,
+                'nosnippet' => false
+            ];
+            
+            update_post_meta( 
+                $post_id, 
+                '_aioseo_robots_default', 
+                0 
+            );
+            
+            update_post_meta( 
+                $post_id, 
+                '_aioseo_robots_noindex', 
+                1 
+            );
         }
+        
+        // Logging für Debug-Zwecke
+        csv_import_log( 'debug', "AIOSEO-Daten für Post {$post_id} gesetzt", [
+            'post_id' => $post_id,
+            'post_title' => $row['post_title'] ?? '',
+            'post_name' => $row['post_name'] ?? '',
+            'meta_title' => $row['meta_title'] ?? '',
+            'meta_description' => $row['meta_description'] ?? '',
+            'has_meta_title' => ! empty( $row['meta_title'] ),
+            'has_meta_description' => ! empty( $row['meta_description'] ),
+            'noindex_set' => $set_noindex
+        ]);
     }
     
-    if ( $seo_plugin === 'rankmath' && class_exists( 'RankMath' ) ) {
-        if ( ! empty( $row['seo_title'] ) ) {
-            update_post_meta( $post_id, 'rank_math_title', sanitize_text_field( $row['seo_title'] ) );
+    // ===================================================================
+    // YOAST SEO - Angepasst für meta_title und meta_description
+    // ===================================================================
+    elseif ( $seo_plugin === 'yoast' && class_exists( 'WPSEO_Options' ) ) {
+        if ( ! empty( $row['meta_title'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                '_yoast_wpseo_title', 
+                sanitize_text_field( $row['meta_title'] ) 
+            );
         }
-        if ( ! empty( $row['seo_description'] ) ) {
-            update_post_meta( $post_id, 'rank_math_description', sanitize_text_field( $row['seo_description'] ) );
+        
+        if ( ! empty( $row['meta_description'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                '_yoast_wpseo_metadesc', 
+                sanitize_textarea_field( $row['meta_description'] ) 
+            );
         }
+        
         if ( $set_noindex ) {
-            update_post_meta( $post_id, 'rank_math_robots', ['noindex'] );
+            update_post_meta( 
+                $post_id, 
+                '_yoast_wpseo_meta-robots-noindex', 
+                '1' 
+            );
         }
+        
+        csv_import_log( 'debug', "Yoast SEO-Daten für Post {$post_id} gesetzt" );
     }
     
-    if ( $set_noindex && $seo_plugin === 'none' ) {
-         update_post_meta( $post_id, '_noindex', '1' );
+    // ===================================================================
+    // RANK MATH - Angepasst für meta_title und meta_description
+    // ===================================================================
+    elseif ( $seo_plugin === 'rankmath' && class_exists( 'RankMath' ) ) {
+        if ( ! empty( $row['meta_title'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                'rank_math_title', 
+                sanitize_text_field( $row['meta_title'] ) 
+            );
+        }
+        
+        if ( ! empty( $row['meta_description'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                'rank_math_description', 
+                sanitize_textarea_field( $row['meta_description'] ) 
+            );
+        }
+        
+        if ( $set_noindex ) {
+            update_post_meta( 
+                $post_id, 
+                'rank_math_robots', 
+                ['noindex'] 
+            );
+        }
+        
+        csv_import_log( 'debug', "Rank Math SEO-Daten für Post {$post_id} gesetzt" );
+    }
+    
+    // ===================================================================
+    // FALLBACK: Kein SEO-Plugin oder Standard-Meta
+    // ===================================================================
+    else {
+        // Setze generische Meta-Tags als Fallback
+        if ( ! empty( $row['meta_title'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                '_seo_title', 
+                sanitize_text_field( $row['meta_title'] ) 
+            );
+        }
+        
+        if ( ! empty( $row['meta_description'] ) ) {
+            update_post_meta( 
+                $post_id, 
+                '_seo_description', 
+                sanitize_textarea_field( $row['meta_description'] ) 
+            );
+        }
+        
+        if ( $set_noindex ) {
+            update_post_meta( $post_id, '_noindex', '1' );
+        }
+        
+        csv_import_log( 'debug', "Standard-SEO-Daten für Post {$post_id} gesetzt (kein SEO-Plugin aktiv)" );
     }
 }
 
