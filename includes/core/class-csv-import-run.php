@@ -1,8 +1,9 @@
 <?php
 /**
  * Die zentrale Klasse zur Durchführung des CSV-Imports.
- * Version 6.0 - MIT SEO-INTEGRATION
+ * Version 6.1 - MIT KORRIGIERTER SEO-INTEGRATION
  * Unterstützt: Breakdance, Elementor, Enfold, WPBakery, Gutenberg
+ * SEO: AIOSEO, Yoast, RankMath
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -248,13 +249,150 @@ class CSV_Import_Pro_Run {
 			$this->process_post_images( $post_id, $data );
 		}
 		
-		// SEO-Daten verarbeiten (KRITISCH - HIER WAR DER FEHLER!)
+		// SEO-Daten verarbeiten - KORRIGIERT!
 		if ( ! empty( $this->config['seo_plugin'] ) && $this->config['seo_plugin'] !== 'none' ) {
-			csv_import_add_seo_data( $post_id, $data, $this->config );
+			$this->process_seo_data( $post_id, $data );
 		}
 		
 		do_action( 'csv_import_post_created', $post_id, $this->session_id, $this->source );
 		return $post_id;
+	}
+
+	/**
+	 * Verarbeitet SEO-Daten für verschiedene SEO-Plugins
+	 * NEUE METHODE - Ersetzt den alten csv_import_add_seo_data() Aufruf
+	 */
+	private function process_seo_data( int $post_id, array $data ): void {
+		$seo_plugin = $this->config['seo_plugin'];
+		$meta_title = $data['meta_title'] ?? '';
+		$meta_description = $data['meta_description'] ?? '';
+		
+		// Wenn keine SEO-Daten vorhanden sind, abbrechen
+		if ( empty( $meta_title ) && empty( $meta_description ) ) {
+			return;
+		}
+		
+		csv_import_log( 'debug', "SEO-Import gestartet für Post {$post_id}", [
+			'plugin' => $seo_plugin,
+			'has_title' => ! empty( $meta_title ),
+			'has_description' => ! empty( $meta_description )
+		]);
+		
+		switch ( $seo_plugin ) {
+			case 'aioseo':
+				$this->import_aioseo_data( $post_id, $meta_title, $meta_description );
+				break;
+				
+			case 'yoast':
+				$this->import_yoast_data( $post_id, $meta_title, $meta_description );
+				break;
+				
+			case 'rankmath':
+				$this->import_rankmath_data( $post_id, $meta_title, $meta_description );
+				break;
+				
+			default:
+				csv_import_log( 'warning', "Unbekanntes SEO-Plugin: {$seo_plugin}" );
+		}
+	}
+	
+	/**
+	 * AIOSEO Integration - KORRIGIERT!
+	 */
+	private function import_aioseo_data( int $post_id, string $meta_title, string $meta_description ): void {
+		csv_import_log( 'debug', "=== AIOSEO IMPORT START für Post {$post_id} ===" );
+		csv_import_log( 'debug', "CSV-Daten: meta_title='{$meta_title}', meta_description='" . substr( $meta_description, 0, 50 ) . "...'" );
+		
+		// Prüfe ob AIOSEO aktiv ist
+		if ( ! function_exists( 'aioseo' ) ) {
+			csv_import_log( 'warning', "AIOSEO: Funktion aioseo() nicht gefunden" );
+			return;
+		}
+		
+		csv_import_log( 'debug', "✓ aioseo() Funktion gefunden" );
+		
+		// Prüfe ob AIOSEO Post Model verfügbar ist
+		if ( ! class_exists( 'AIOSEO\Plugin\Common\Models\Post' ) ) {
+			csv_import_log( 'warning', "AIOSEO: Post Model Klasse nicht gefunden" );
+			return;
+		}
+		
+		csv_import_log( 'debug', "✓ AIOSEO Post Model verfügbar" );
+		
+		try {
+			// Direkter Zugriff auf das Post-Model
+			$aioseo_post = \AIOSEO\Plugin\Common\Models\Post::getPost( $post_id );
+			
+			if ( ! $aioseo_post ) {
+				// Post existiert noch nicht in AIOSEO DB, erstelle ihn
+				csv_import_log( 'debug', "Erstelle neuen AIOSEO Post-Eintrag" );
+				$aioseo_post = new \AIOSEO\Plugin\Common\Models\Post();
+				$aioseo_post->post_id = $post_id;
+			} else {
+				csv_import_log( 'debug', "AIOSEO Post-Eintrag gefunden, aktualisiere..." );
+			}
+			
+			// Setze die SEO-Daten
+			$updated_fields = [];
+			
+			if ( ! empty( $meta_title ) ) {
+				$aioseo_post->title = sanitize_text_field( $meta_title );
+				$updated_fields[] = 'title';
+				csv_import_log( 'debug', "✓ Meta Title gesetzt: {$meta_title}" );
+			}
+			
+			if ( ! empty( $meta_description ) ) {
+				$aioseo_post->description = sanitize_textarea_field( $meta_description );
+				$updated_fields[] = 'description';
+				csv_import_log( 'debug', "✓ Meta Description gesetzt: " . substr( $meta_description, 0, 50 ) . "..." );
+			}
+			
+			// Speichere die Änderungen
+			$save_result = $aioseo_post->save();
+			
+			if ( $save_result ) {
+				csv_import_log( 'info', "✓ AIOSEO-Daten erfolgreich gespeichert für Post {$post_id}", [
+					'updated_fields' => $updated_fields
+				]);
+			} else {
+				csv_import_log( 'warning', "AIOSEO: save() returned false für Post {$post_id}" );
+			}
+			
+		} catch ( Exception $e ) {
+			csv_import_log( 'error', "FEHLER beim AIOSEO Import für Post {$post_id}: " . $e->getMessage(), [
+				'trace' => $e->getTraceAsString()
+			]);
+		}
+	}
+	
+	/**
+	 * Yoast SEO Integration
+	 */
+	private function import_yoast_data( int $post_id, string $meta_title, string $meta_description ): void {
+		if ( ! empty( $meta_title ) ) {
+			update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $meta_title ) );
+		}
+		
+		if ( ! empty( $meta_description ) ) {
+			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta_description ) );
+		}
+		
+		csv_import_log( 'debug', "Yoast SEO Daten gespeichert für Post {$post_id}" );
+	}
+	
+	/**
+	 * RankMath Integration
+	 */
+	private function import_rankmath_data( int $post_id, string $meta_title, string $meta_description ): void {
+		if ( ! empty( $meta_title ) ) {
+			update_post_meta( $post_id, 'rank_math_title', sanitize_text_field( $meta_title ) );
+		}
+		
+		if ( ! empty( $meta_description ) ) {
+			update_post_meta( $post_id, 'rank_math_description', sanitize_textarea_field( $meta_description ) );
+		}
+		
+		csv_import_log( 'debug', "RankMath Daten gespeichert für Post {$post_id}" );
 	}
 
 	private function apply_page_builder_template( int $post_id, array $data ): void {
