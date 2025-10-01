@@ -1002,7 +1002,18 @@ function csv_import_apply_template( int $template_id, array $row, array $config 
  * Fügt Meta-Felder zum Post hinzu
  */
 function csv_import_add_meta_fields( int $post_id, array $row, array $config ): void {
-    $skip_fields = ['post_title', 'post_content', 'post_excerpt', 'post_name', 'title', 'content', 'excerpt'];
+    // SEO-Spalten NICHT als Meta-Felder speichern
+    $skip_fields = [
+        'post_title', 
+        'post_content', 
+        'post_excerpt', 
+        'post_name', 
+        'title', 
+        'content', 
+        'excerpt',
+        'meta_title',        // NEU
+        'meta_description'   // NEU
+    ];
     
     foreach ( $row as $key => $value ) {
         if ( ! in_array( $key, $skip_fields ) && ! empty( $value ) ) {
