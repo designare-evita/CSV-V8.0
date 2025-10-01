@@ -1105,17 +1105,8 @@ function csv_import_download_and_attach_image( string $image_url, int $post_id )
     return $attachment_id;
 }
 
-/**
- * Fügt SEO-Daten hinzu
- */
-<?php
-/**
- * KORRIGIERTE FUNKTION: Fügt SEO-Daten hinzu
- * Diese Version unterstützt korrekt All in One SEO (AIOSEO)
- * 
- * Ersetzen Sie die bestehende csv_import_add_seo_data() Funktion in:
- * includes/core/core-functions.php (ca. Zeile 1580)
- */
+
+
 function csv_import_add_seo_data( int $post_id, array $row, array $config ): void {
     $seo_plugin = $config['seo_plugin'];
     $set_noindex = get_option('csv_import_noindex_posts', false);
