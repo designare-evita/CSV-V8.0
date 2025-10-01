@@ -96,9 +96,10 @@ function csv_import_pro_load_core_files() {
  * Version 8.6 - Optimierte Ladungsreihenfolge mit verbesserter Fehlerbehandlung
  */
 function csv_import_pro_load_plugin_files() {
+    // KRITISCHE ÄNDERUNG: Memory Cache OPTIONAL machen
     $files_to_include = [
         // === HAUPT-KLASSEN (in Abhängigkeits-Reihenfolge) ===
-        'includes/core/class-csv-import-run.php',        // Benötigt core-functions.php
+        'includes/core/class-csv-import-run.php',
         
         // === FEATURE-KLASSEN ===
         'includes/classes/class-csv-import-backup-manager.php',
@@ -107,91 +108,139 @@ function csv_import_pro_load_plugin_files() {
         'includes/classes/class-csv-import-profile-manager.php',
         'includes/classes/class-csv-import-template-manager.php',
         'includes/classes/class-csv-import-validator.php',
-        'includes/classes/class-csv-import-memory-cache.php',
+        // CACHE NUR LADEN WENN NICHT DEAKTIVIERT
+        // 'includes/classes/class-csv-import-memory-cache.php', // TEMPORÄR DEAKTIVIERT
         
-        // === SCHEDULER (nach allen Dependencies) ===
-        'includes/classes/class-csv-import-scheduler.php', // Benötigt core-functions.php + Error Handler
+        // === SCHEDULER ===
+        'includes/classes/class-csv-import-scheduler.php',
         
-        // === ADMIN-BEREICH (nur wenn im Admin) ===
-        'includes/admin/class-seo-preview.php',           // SEO-Klasse
-        'includes/admin/class-admin-menus.php',           // Benötigt alle anderen Klassen
-        'includes/admin/admin-ajax.php',                  // AJAX-Handler
+        // === ADMIN (nur im Admin) ===
+        'includes/admin/class-seo-preview.php',
+        'includes/admin/class-admin-menus.php',
+        'includes/admin/admin-ajax.php',
     ];
+
+    // Cache-Datei nur laden wenn nicht explizit deaktiviert
+    if (!defined('CSV_IMPORT_DISABLE_CACHE') || !CSV_IMPORT_DISABLE_CACHE) {
+        // Prüfe Memory vor Cache-Ladung
+        $current_memory = memory_get_usage(true);
+        $memory_limit = ini_get('memory_limit');
+        
+        if ($memory_limit !== '-1') {
+            $memory_bytes = function_exists('wp_convert_hr_to_bytes') ? 
+                          wp_convert_hr_to_bytes($memory_limit) : 
+                          (int)str_replace('M', '', $memory_limit) * 1024 * 1024;
+            
+            // Nur Cache laden wenn genug Memory verfügbar
+            if ($current_memory < ($memory_bytes * 0.7)) { // Unter 70%
+                array_unshift($files_to_include, 'includes/classes/class-csv-import-memory-cache.php');
+            } else {
+                error_log('CSV Import: Cache nicht geladen - Memory-Limit fast erreicht');
+                define('CSV_IMPORT_CACHE_DISABLED', true);
+            }
+        }
+    } else {
+        define('CSV_IMPORT_CACHE_DISABLED', true);
+    }
 
     $loaded_files = [];
     $failed_files = [];
     $load_errors = [];
 
-    foreach ( $files_to_include as $file ) {
+    foreach ($files_to_include as $file) {
         // Admin-Dateien nur im Admin-Bereich laden
-        if ( strpos( $file, 'includes/admin/' ) === 0 && ! is_admin() ) {
+        if (strpos($file, 'includes/admin/') === 0 && !is_admin()) {
             continue;
         }
         
         $path = CSV_IMPORT_PRO_PATH . $file;
-        if ( file_exists( $path ) ) {
+        if (file_exists($path)) {
             try {
                 require_once $path;
                 $loaded_files[] = $file;
                 
-                // Debug-Log für erfolgreiche Ladung
-                if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-                    error_log( 'CSV Import Pro: Geladen - ' . basename( $file ) );
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('CSV Import: Geladen - ' . basename($file));
                 }
-            } catch ( ParseError $e ) {
+            } catch (ParseError $e) {
                 $error_msg = 'Parse Error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
-                $load_errors[] = basename( $file ) . ': ' . $error_msg;
-                error_log( 'CSV Import Pro: Parse Error in ' . $file . ': ' . $e->getMessage() );
-            } catch ( Exception $e ) {
+                $load_errors[] = basename($file) . ': ' . $error_msg;
+                error_log('CSV Import: Parse Error in ' . $file . ': ' . $e->getMessage());
+            } catch (Exception $e) {
                 $error_msg = 'Exception: ' . $e->getMessage();
-                $load_errors[] = basename( $file ) . ': ' . $error_msg;
-                error_log( 'CSV Import Pro: Exception beim Laden von ' . $file . ': ' . $e->getMessage() );
+                $load_errors[] = basename($file) . ': ' . $error_msg;
+                error_log('CSV Import: Exception beim Laden von ' . $file . ': ' . $e->getMessage());
             }
         } else {
             $failed_files[] = $file;
-            error_log( 'CSV Import Pro: Datei fehlt - ' . $path );
+            error_log('CSV Import: Datei fehlt - ' . $path);
         }
     }
     
-    // Log-Zusammenfassung
-    if ( function_exists( 'csv_import_log' ) ) {
-        csv_import_log( 'info', 'Plugin-Dateien geladen', [
-            'loaded_count' => count( $loaded_files ),
-            'failed_count' => count( $failed_files ),
-            'error_count' => count( $load_errors ),
-            'failed_files' => $failed_files,
-            'load_errors' => $load_errors
+    // Logging
+    if (function_exists('csv_import_log')) {
+        csv_import_log('info', 'Plugin-Dateien geladen', [
+            'loaded_count' => count($loaded_files),
+            'failed_count' => count($failed_files),
+            'error_count' => count($load_errors),
+            'cache_disabled' => defined('CSV_IMPORT_CACHE_DISABLED'),
+            'memory_usage' => size_format(memory_get_usage(true))
         ]);
     }
     
-    // Admin-Notice für Probleme
-    if ( ! empty( $failed_files ) || ! empty( $load_errors ) ) {
-        add_action( 'admin_notices', function() use ( $failed_files, $load_errors ) {
-            if ( ! empty( $failed_files ) ) {
-                echo '<div class="notice notice-warning"><p>';
-                echo '<strong>CSV Import Pro:</strong> ' . count( $failed_files ) . ' Dateien fehlen - Plugin möglicherweise unvollständig installiert.';
+    // Admin-Notices für Probleme
+    if (!empty($failed_files) || !empty($load_errors)) {
+        add_action('admin_notices', function() use ($failed_files, $load_errors) {
+            if (!empty($failed_files)) {
+                echo '<div class="notice notice-error"><p>';
+                echo '<strong>CSV Import Pro:</strong> ' . count($failed_files) . ' Dateien fehlen.';
                 echo '</p></div>';
             }
             
-            if ( ! empty( $load_errors ) ) {
+            if (!empty($load_errors)) {
                 echo '<div class="notice notice-error"><p>';
-                echo '<strong>CSV Import Pro:</strong> ' . count( $load_errors ) . ' Dateien konnten nicht geladen werden:';
-                echo '<ul style="margin-left: 20px;">';
-                foreach ( array_slice( $load_errors, 0, 3 ) as $error ) { // Nur erste 3 Fehler anzeigen
-                    echo '<li><code>' . esc_html( $error ) . '</code></li>';
-                }
-                if ( count( $load_errors ) > 3 ) {
-                    echo '<li>... und ' . ( count( $load_errors ) - 3 ) . ' weitere</li>';
-                }
-                echo '</ul>';
+                echo '<strong>CSV Import Pro:</strong> ' . count($load_errors) . ' Lade-Fehler:<br>';
+                echo '<code>' . esc_html(implode('<br>', array_slice($load_errors, 0, 3))) . '</code>';
                 echo '</p></div>';
             }
         });
     }
     
-    return empty( $failed_files ) && empty( $load_errors );
+    return empty($failed_files) && empty($load_errors);
 }
 
+
+/**
+ * === KORREKTUR 2: Memory Limit erhöhen ===
+ * Fügen Sie diese Funktion VOR csv_import_pro_init() ein:
+ */
+
+function csv_import_increase_memory_limit() {
+    $current_limit = ini_get('memory_limit');
+    
+    if ($current_limit === '-1') {
+        return; // Unbegrenzt
+    }
+    
+    $limit_bytes = function_exists('wp_convert_hr_to_bytes') ? 
+                   wp_convert_hr_to_bytes($current_limit) : 
+                   (int)str_replace('M', '', $current_limit) * 1024 * 1024;
+    
+    // Wenn unter 256MB, versuche zu erhöhen
+    if ($limit_bytes < 268435456) { // 256MB
+        @ini_set('memory_limit', '512M');
+        
+        if (function_exists('csv_import_log')) {
+            csv_import_log('info', 'Memory Limit erhöht', [
+                'original' => $current_limit,
+                'new' => ini_get('memory_limit')
+            ]);
+        }
+    }
+}
+
+// Memory Limit SOFORT bei Plugin-Ladung erhöhen
+csv_import_increase_memory_limit();
 /**
  * Sichere Scheduler-Initialisierung mit umfassenden Dependency-Checks
  * Version 8.6 - Komplett überarbeitete Initialisierung ohne Doppelladung
