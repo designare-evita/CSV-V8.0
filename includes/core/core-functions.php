@@ -1126,76 +1126,61 @@ function csv_import_add_seo_data( int $post_id, array $row, array $config ): voi
     // ALL IN ONE SEO (AIOSEO) - KORRIGIERT FÜR IHRE CSV-STRUKTUR
     // ===================================================================
     if ( $seo_plugin === 'aioseo' ) {
-        // Prüfen ob AIOSEO installiert und aktiv ist
-        if ( ! class_exists( 'AIOSEO\\Plugin\\AIOSEO' ) && ! function_exists( 'aioseo' ) ) {
-            csv_import_log( 'warning', "All in One SEO Plugin nicht gefunden - überspringe SEO-Daten für Post {$post_id}" );
-            return;
-        }
-
-        // SEO Title aus meta_title Spalte setzen
-        if ( ! empty( $row['meta_title'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                '_aioseo_title', 
-                sanitize_text_field( $row['meta_title'] ) 
-            );
-        }
-        
-        // SEO Description aus meta_description Spalte setzen
-        if ( ! empty( $row['meta_description'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                '_aioseo_description', 
-                sanitize_textarea_field( $row['meta_description'] ) 
-            );
-        }
-        
-        // Fallback: Wenn meta_title leer ist, nutze post_title
-        if ( empty( $row['meta_title'] ) && ! empty( $row['post_title'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                '_aioseo_title', 
-                sanitize_text_field( $row['post_title'] ) 
-            );
-        }
-        
-        // Noindex setzen wenn aktiviert
-        if ( $set_noindex ) {
-            // AIOSEO verwendet eine JSON-Struktur für robots Meta
-            $robots_meta = [
-                'default' => false,
-                'noindex' => true,
-                'nofollow' => false,
-                'noarchive' => false,
-                'noimageindex' => false,
-                'nosnippet' => false
-            ];
-            
-            update_post_meta( 
-                $post_id, 
-                '_aioseo_robots_default', 
-                0 
-            );
-            
-            update_post_meta( 
-                $post_id, 
-                '_aioseo_robots_noindex', 
-                1 
-            );
-        }
-        
-        // Logging für Debug-Zwecke
-        csv_import_log( 'debug', "AIOSEO-Daten für Post {$post_id} gesetzt", [
-            'post_id' => $post_id,
-            'post_title' => $row['post_title'] ?? '',
-            'post_name' => $row['post_name'] ?? '',
-            'meta_title' => $row['meta_title'] ?? '',
-            'meta_description' => $row['meta_description'] ?? '',
-            'has_meta_title' => ! empty( $row['meta_title'] ),
-            'has_meta_description' => ! empty( $row['meta_description'] ),
-            'noindex_set' => $set_noindex
-        ]);
+    // Prüfen ob AIOSEO installiert und aktiv ist
+    if ( ! function_exists( 'aioseo' ) ) {
+        csv_import_log( 'warning', "All in One SEO Plugin nicht gefunden - überspringe SEO-Daten für Post {$post_id}" );
+        return;
     }
+
+    // WICHTIG: AIOSEO's eigene API verwenden
+    if ( class_exists( 'AIOSEO\Plugin\Common\Models\Post' ) ) {
+        // Hole das AIOSEO Post-Objekt
+        $aioseo_post = \AIOSEO\Plugin\Common\Models\Post::getPost( $post_id );
+        
+        if ( $aioseo_post ) {
+            // SEO Title setzen
+            if ( ! empty( $row['meta_title'] ) ) {
+                $aioseo_post->title = sanitize_text_field( $row['meta_title'] );
+            } elseif ( ! empty( $row['post_title'] ) ) {
+                $aioseo_post->title = sanitize_text_field( $row['post_title'] );
+            }
+            
+            // SEO Description setzen
+            if ( ! empty( $row['meta_description'] ) ) {
+                $aioseo_post->description = sanitize_textarea_field( $row['meta_description'] );
+            }
+            
+            // Noindex setzen
+            if ( $set_noindex ) {
+                $aioseo_post->robots_default = false;
+                $aioseo_post->robots_noindex = true;
+            }
+            
+            // Speichern - dies schreibt in die AIOSEO-Tabelle
+            $aioseo_post->save();
+            
+            csv_import_log( 'debug', "AIOSEO-Daten für Post {$post_id} via API gesetzt", [
+                'post_id' => $post_id,
+                'title_set' => ! empty( $row['meta_title'] ),
+                'description_set' => ! empty( $row['meta_description'] ),
+                'noindex_set' => $set_noindex
+            ]);
+        } else {
+            csv_import_log( 'warning', "AIOSEO Post-Objekt für Post {$post_id} konnte nicht erstellt werden" );
+        }
+    } else {
+        // Fallback: Direkte Meta-Felder (für ältere AIOSEO-Versionen)
+        csv_import_log( 'warning', "AIOSEO API nicht verfügbar, verwende Fallback-Methode für Post {$post_id}" );
+        
+        if ( ! empty( $row['meta_title'] ) ) {
+            update_post_meta( $post_id, '_aioseo_title', sanitize_text_field( $row['meta_title'] ) );
+        }
+        
+        if ( ! empty( $row['meta_description'] ) ) {
+            update_post_meta( $post_id, '_aioseo_description', sanitize_textarea_field( $row['meta_description'] ) );
+        }
+    }
+}
     
     // ===================================================================
     // YOAST SEO - Angepasst für meta_title und meta_description
