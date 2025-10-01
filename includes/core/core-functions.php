@@ -1123,148 +1123,194 @@ function csv_import_add_seo_data( int $post_id, array $row, array $config ): voi
     $set_noindex = get_option('csv_import_noindex_posts', false);
 
     // ===================================================================
-    // ALL IN ONE SEO (AIOSEO) - KORRIGIERT FÜR IHRE CSV-STRUKTUR
+    // ALL IN ONE SEO (AIOSEO) - MIT VOLLSTÄNDIGER DIAGNOSE
     // ===================================================================
     if ( $seo_plugin === 'aioseo' ) {
-    // Prüfen ob AIOSEO installiert und aktiv ist
-    if ( ! function_exists( 'aioseo' ) ) {
-        csv_import_log( 'warning', "All in One SEO Plugin nicht gefunden - überspringe SEO-Daten für Post {$post_id}" );
-        return;
-    }
+        error_log("=== AIOSEO IMPORT START für Post {$post_id} ===");
+        error_log("CSV-Daten: meta_title='" . ($row['meta_title'] ?? 'LEER') . "', meta_description='" . substr($row['meta_description'] ?? 'LEER', 0, 50) . "...'");
+        
+        // Schritt 1: Prüfe ob aioseo() Funktion existiert
+        if ( ! function_exists( 'aioseo' ) ) {
+            error_log("FEHLER: aioseo() Funktion nicht gefunden!");
+            csv_import_log( 'warning', "All in One SEO Plugin nicht gefunden - überspringe SEO-Daten für Post {$post_id}" );
+            return;
+        }
+        error_log("✓ aioseo() Funktion gefunden");
 
-    // Hole die AIOSEO-Instanz
-    $aioseo = aioseo();
-    
-    if ( ! $aioseo || ! isset( $aioseo->post ) ) {
-        csv_import_log( 'warning', "AIOSEO-Instanz nicht verfügbar für Post {$post_id}" );
-        return;
-    }
+        // Schritt 2: Hole AIOSEO-Instanz
+        $aioseo = aioseo();
+        if ( ! $aioseo ) {
+            error_log("FEHLER: aioseo() liefert NULL!");
+            return;
+        }
+        error_log("✓ AIOSEO-Instanz: " . get_class($aioseo));
 
-    // Hole das Post-Objekt über die API
-    $aioseo_post = $aioseo->post->getPost( $post_id );
-    
-    if ( ! $aioseo_post ) {
-        csv_import_log( 'warning', "AIOSEO Post-Objekt konnte nicht geladen werden für Post {$post_id}" );
-        return;
-    }
+        // Schritt 3: Prüfe ob post-Objekt verfügbar
+        if ( ! isset( $aioseo->post ) ) {
+            error_log("FEHLER: aioseo()->post nicht verfügbar!");
+            return;
+        }
+        error_log("✓ aioseo()->post verfügbar");
 
-    // SEO Title setzen
-    if ( ! empty( $row['meta_title'] ) ) {
-        $aioseo_post->title = sanitize_text_field( $row['meta_title'] );
-    } elseif ( ! empty( $row['post_title'] ) ) {
-        $aioseo_post->title = sanitize_text_field( $row['post_title'] );
+        // Schritt 4: Hole Post-Objekt
+        $aioseo_post = $aioseo->post->getPost( $post_id );
+        if ( ! $aioseo_post ) {
+            error_log("FEHLER: getPost({$post_id}) liefert NULL!");
+            
+            // Versuche direkten Datenbank-Zugriff als Fallback
+            error_log("Versuche Fallback: Direkte Meta-Felder...");
+            if ( ! empty( $row['meta_title'] ) ) {
+                update_post_meta( $post_id, '_aioseo_title', sanitize_text_field( $row['meta_title'] ) );
+                error_log("Fallback: _aioseo_title gesetzt");
+            }
+            if ( ! empty( $row['meta_description'] ) ) {
+                update_post_meta( $post_id, '_aioseo_description', sanitize_textarea_field( $row['meta_description'] ) );
+                error_log("Fallback: _aioseo_description gesetzt");
+            }
+            return;
+        }
+        error_log("✓ AIOSEO Post-Objekt geladen");
+
+        // Schritt 5: Setze Title
+        $title_to_set = '';
+        if ( ! empty( $row['meta_title'] ) ) {
+            $title_to_set = sanitize_text_field( $row['meta_title'] );
+            $aioseo_post->title = $title_to_set;
+            error_log("✓ Title gesetzt: '{$title_to_set}'");
+        } elseif ( ! empty( $row['post_title'] ) ) {
+            $title_to_set = sanitize_text_field( $row['post_title'] );
+            $aioseo_post->title = $title_to_set;
+            error_log("✓ Title (Fallback post_title): '{$title_to_set}'");
+        } else {
+            error_log("⚠ Kein Title verfügbar");
+        }
+        
+        // Schritt 6: Setze Description
+        if ( ! empty( $row['meta_description'] ) ) {
+            $desc = sanitize_textarea_field( $row['meta_description'] );
+            $aioseo_post->description = $desc;
+            error_log("✓ Description gesetzt: '" . substr($desc, 0, 50) . "...' (Länge: " . strlen($desc) . ")");
+        } else {
+            error_log("⚠ Keine Description verfügbar");
+        }
+        
+        // Schritt 7: Setze Noindex
+        if ( $set_noindex ) {
+            $aioseo_post->robots_default = false;
+            $aioseo_post->robots_noindex = true;
+            error_log("✓ Noindex aktiviert");
+        }
+        
+        // Schritt 8: Speichern
+        error_log("Versuche zu speichern...");
+        try {
+            $save_result = $aioseo_post->save();
+            error_log("✓ save() ausgeführt, Rückgabe: " . var_export($save_result, true));
+        } catch (Exception $e) {
+            error_log("FEHLER beim Speichern: " . $e->getMessage());
+            error_log("Trace: " . $e->getTraceAsString());
+        }
+        
+        // Schritt 9: Verifikation - Prüfe was in DB steht
+        global $wpdb;
+        $table = $wpdb->prefix . 'aioseo_posts';
+        
+        if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") === $table) {
+            error_log("✓ Tabelle {$table} existiert");
+            
+            $db_data = $wpdb->get_row($wpdb->prepare(
+                "SELECT title, description, robots_default, robots_noindex FROM {$table} WHERE post_id = %d",
+                $post_id
+            ), ARRAY_A);
+            
+            if ($db_data) {
+                error_log("✓ DB-Eintrag gefunden:");
+                error_log("  - title: '" . ($db_data['title'] ?? 'NULL') . "'");
+                error_log("  - description: '" . substr($db_data['description'] ?? 'NULL', 0, 50) . "...'");
+                error_log("  - robots_noindex: " . ($db_data['robots_noindex'] ?? 'NULL'));
+            } else {
+                error_log("⚠ KEIN DB-Eintrag gefunden für Post {$post_id}!");
+                error_log("Erstelle manuellen DB-Eintrag...");
+                
+                $wpdb->insert(
+                    $table,
+                    [
+                        'post_id' => $post_id,
+                        'title' => $title_to_set,
+                        'description' => $row['meta_description'] ?? '',
+                        'robots_default' => $set_noindex ? 0 : 1,
+                        'robots_noindex' => $set_noindex ? 1 : 0,
+                        'created' => current_time('mysql'),
+                        'updated' => current_time('mysql')
+                    ],
+                    ['%d', '%s', '%s', '%d', '%d', '%s', '%s']
+                );
+                
+                if ($wpdb->insert_id) {
+                    error_log("✓ Manueller DB-Eintrag erstellt (ID: {$wpdb->insert_id})");
+                } else {
+                    error_log("FEHLER: Manueller DB-Insert fehlgeschlagen: " . $wpdb->last_error);
+                }
+            }
+        } else {
+            error_log("FEHLER: Tabelle {$table} existiert nicht!");
+        }
+        
+        error_log("=== AIOSEO IMPORT ENDE ===\n");
+        
+        csv_import_log( 'debug', "AIOSEO-Daten für Post {$post_id} verarbeitet", [
+            'title_set' => !empty($title_to_set),
+            'desc_set' => !empty($row['meta_description']),
+            'noindex' => $set_noindex
+        ]);
     }
-    
-    // SEO Description setzen
-    if ( ! empty( $row['meta_description'] ) ) {
-        $aioseo_post->description = sanitize_textarea_field( $row['meta_description'] );
-    }
-    
-    // Noindex setzen
-    if ( $set_noindex ) {
-        $aioseo_post->robots_default = false;
-        $aioseo_post->robots_noindex = true;
-    }
-    
-    // Speichern
-    $aioseo_post->save();
-    
-    csv_import_log( 'debug', "AIOSEO-Daten für Post {$post_id} gespeichert", [
-        'post_id' => $post_id,
-        'title' => $row['meta_title'] ?? $row['post_title'] ?? '',
-        'description_length' => strlen( $row['meta_description'] ?? '' ),
-        'noindex' => $set_noindex
-    ]);
-}
     
     // ===================================================================
-    // YOAST SEO - Angepasst für meta_title und meta_description
+    // YOAST SEO
     // ===================================================================
     elseif ( $seo_plugin === 'yoast' && class_exists( 'WPSEO_Options' ) ) {
         if ( ! empty( $row['meta_title'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                '_yoast_wpseo_title', 
-                sanitize_text_field( $row['meta_title'] ) 
-            );
+            update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $row['meta_title'] ) );
         }
-        
         if ( ! empty( $row['meta_description'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                '_yoast_wpseo_metadesc', 
-                sanitize_textarea_field( $row['meta_description'] ) 
-            );
+            update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $row['meta_description'] ) );
         }
-        
         if ( $set_noindex ) {
-            update_post_meta( 
-                $post_id, 
-                '_yoast_wpseo_meta-robots-noindex', 
-                '1' 
-            );
+            update_post_meta( $post_id, '_yoast_wpseo_meta-robots-noindex', '1' );
         }
-        
         csv_import_log( 'debug', "Yoast SEO-Daten für Post {$post_id} gesetzt" );
     }
     
     // ===================================================================
-    // RANK MATH - Angepasst für meta_title und meta_description
+    // RANK MATH
     // ===================================================================
     elseif ( $seo_plugin === 'rankmath' && class_exists( 'RankMath' ) ) {
         if ( ! empty( $row['meta_title'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                'rank_math_title', 
-                sanitize_text_field( $row['meta_title'] ) 
-            );
+            update_post_meta( $post_id, 'rank_math_title', sanitize_text_field( $row['meta_title'] ) );
         }
-        
         if ( ! empty( $row['meta_description'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                'rank_math_description', 
-                sanitize_textarea_field( $row['meta_description'] ) 
-            );
+            update_post_meta( $post_id, 'rank_math_description', sanitize_textarea_field( $row['meta_description'] ) );
         }
-        
         if ( $set_noindex ) {
-            update_post_meta( 
-                $post_id, 
-                'rank_math_robots', 
-                ['noindex'] 
-            );
+            update_post_meta( $post_id, 'rank_math_robots', ['noindex'] );
         }
-        
         csv_import_log( 'debug', "Rank Math SEO-Daten für Post {$post_id} gesetzt" );
     }
     
     // ===================================================================
-    // FALLBACK: Kein SEO-Plugin oder Standard-Meta
+    // FALLBACK
     // ===================================================================
     else {
-        // Setze generische Meta-Tags als Fallback
         if ( ! empty( $row['meta_title'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                '_seo_title', 
-                sanitize_text_field( $row['meta_title'] ) 
-            );
+            update_post_meta( $post_id, '_seo_title', sanitize_text_field( $row['meta_title'] ) );
         }
-        
         if ( ! empty( $row['meta_description'] ) ) {
-            update_post_meta( 
-                $post_id, 
-                '_seo_description', 
-                sanitize_textarea_field( $row['meta_description'] ) 
-            );
+            update_post_meta( $post_id, '_seo_description', sanitize_textarea_field( $row['meta_description'] ) );
         }
-        
         if ( $set_noindex ) {
             update_post_meta( $post_id, '_noindex', '1' );
         }
-        
-        csv_import_log( 'debug', "Standard-SEO-Daten für Post {$post_id} gesetzt (kein SEO-Plugin aktiv)" );
+        csv_import_log( 'debug', "Standard-SEO-Daten für Post {$post_id} gesetzt" );
     }
 }
 
